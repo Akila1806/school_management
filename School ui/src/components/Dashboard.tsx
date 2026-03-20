@@ -198,52 +198,52 @@ export default function Dashboard() {
         <h1 className={styles.dashTitle}>School Dashboard</h1>
 
         <div className={styles.profileWrapper}>
-          <button className={styles.profileBtn} onClick={() => setProfileOpen(o => !o)}>
-            <div className={styles.profileAvatar}>
-              <img
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=SarahJohnson&backgroundColor=6366f1&clothingColor=6366f1"
-                alt="Ms. Sarah Johnson"
-                width="32"
-                height="32"
-                style={{ borderRadius: '50%', display: 'block' }}
-              />
-            </div>
-            <div className={styles.profileInfo}>
-              <span className={styles.profileName}>Ms. Sarah Johnson</span>
-              <span className={styles.profileRole}>Class Teacher · Grade 4</span>
-            </div>
-            <span className={styles.profileChevron}>{profileOpen ? '▲' : '▼'}</span>
-          </button>
+        <button className={styles.profileBtn} onClick={() => setProfileOpen(o => !o)}>
+          <div className={styles.profileAvatar}>
+            <img
+              src="https://api.dicebear.com/7.x/avataaars/svg?seed=SarahJohnson&backgroundColor=6366f1&clothingColor=6366f1"
+              alt="Ms. Sarah Johnson"
+              width="32"
+              height="32"
+              style={{ borderRadius: '50%', display: 'block' }}
+            />
+          </div>
+          <div className={styles.profileInfo}>
+            <span className={styles.profileName}>Ms. Sarah Johnson</span>
+            <span className={styles.profileRole}>Class Teacher · Grade 4</span>
+          </div>
+          <span className={styles.profileChevron}>{profileOpen ? '▲' : '▼'}</span>
+        </button>
 
-          {profileOpen && (
-            <div className={styles.profileDropdown}>
-              <div className={styles.profileDropdownHeader}>
-                <div className={styles.profileAvatarLg}>
-                  <img
-                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=SarahJohnson&backgroundColor=6366f1&clothingColor=6366f1"
-                    alt="Ms. Sarah Johnson"
-                    width="42"
-                    height="42"
-                    style={{ borderRadius: '50%', display: 'block' }}
-                  />
-                </div>
-                <div>
-                  <div className={styles.profileDropdownName}>Ms. Sarah Johnson</div>
-                  <div className={styles.profileDropdownRole}>Class Teacher</div>
-                  <div className={styles.profileDropdownEmail}>sarah.j@school.edu</div>
-                </div>
+        {profileOpen && (
+          <div className={styles.profileDropdown}>
+            <div className={styles.profileDropdownHeader}>
+              <div className={styles.profileAvatarLg}>
+                <img
+                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=SarahJohnson&backgroundColor=6366f1&clothingColor=6366f1"
+                  alt="Ms. Sarah Johnson"
+                  width="42"
+                  height="42"
+                  style={{ borderRadius: '50%', display: 'block' }}
+                />
               </div>
-              <div className={styles.profileDropdownDivider} />
-              <button className={styles.profileDropdownItem}>👤 My Profile</button>
-              <button className={styles.profileDropdownItem}>📅 My Schedule</button>
-              <button className={styles.profileDropdownItem}>🔔 Notifications</button>
-              <button className={styles.profileDropdownItem}>⚙️ Settings</button>
-              <div className={styles.profileDropdownDivider} />
-              <button className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}>
-                🚪 Sign Out
-              </button>
+              <div>
+                <div className={styles.profileDropdownName}>Ms. Sarah Johnson</div>
+                <div className={styles.profileDropdownRole}>Class Teacher</div>
+                <div className={styles.profileDropdownEmail}>sarah.j@school.edu</div>
+              </div>
             </div>
-          )}
+            <div className={styles.profileDropdownDivider} />
+            <button className={styles.profileDropdownItem}>👤 My Profile</button>
+            <button className={styles.profileDropdownItem}>📅 My Schedule</button>
+            <button className={styles.profileDropdownItem}>🔔 Notifications</button>
+            <button className={styles.profileDropdownItem}>⚙️ Settings</button>
+            <div className={styles.profileDropdownDivider} />
+            <button className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}>
+              🚪 Sign Out
+            </button>
+          </div>
+        )}
         </div>
       </div>
 

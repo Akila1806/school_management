@@ -338,7 +338,7 @@
    ===================== */
 .profileWrapper {
   position: relative;
-  margin-left: 0.75rem;
+  margin-left: auto;
 }
 
 .profileBtn {
