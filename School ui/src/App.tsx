@@ -3,6 +3,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import Dashboard from '@/components/Dashboard'
 import StudentsSection from '@/components/StudentsSection'
+import UpdateStudentForm from '@/components/UpdateStudentForm'
 import ChatPanel, { ChatPanelHandle } from '@/components/ChatPanel'
 import TabBar, { Tab } from '@/components/TabBar'
 import SplitLayout from '@/components/SplitLayout'
@@ -23,6 +24,7 @@ function rowToForm(row: Record<string, unknown>) {
     age = String(Math.max(0, a))
   }
   return {
+    studentId: String(row.student_id ?? ''),
     firstName: String(row.first_name ?? ''),
     lastName: String(row.last_name ?? ''),
     grade: String(row.grade_level ?? ''),
@@ -119,6 +121,10 @@ function AppContent() {
     setActiveTab(tabId)
   }
 
+  const handleStudentUpdated = (form: Record<string, string>) => {
+    chatRef.current?.addStudentUpdatedMessage(form)
+  }
+
   const handleShowDashboard = () => {
     // Check if dashboard tab already exists
     const existingDashboard = tabs.find(tab => tab.id === 'dashboard')
@@ -164,7 +170,11 @@ function AppContent() {
     if (activeTab === 'dashboard') {
       return <Dashboard />
     } else if (activeTab.startsWith('student-')) {
-      return <StudentsSection prefill={prefillMap[activeTab]} onStudentCreated={handleStudentCreated} />
+      const prefill = prefillMap[activeTab]
+      if (prefill?.studentId) {
+        return <UpdateStudentForm prefill={prefill} onStudentUpdated={handleStudentUpdated} />
+      }
+      return <StudentsSection onStudentCreated={handleStudentCreated} />
     } else if (activeTab === '' || tabs.length === 0) {
       // Show greeting screen when no tabs are open
       return (

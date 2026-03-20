@@ -21,6 +21,7 @@ interface Props {
 
 export interface ChatPanelHandle {
   addStudentCreatedMessage: (form: Record<string, string>) => void
+  addStudentUpdatedMessage: (form: Record<string, string>) => void
 }
 
 let msgId = 0
@@ -200,6 +201,22 @@ function renderTable(data: Record<string, unknown>[]) {
 }
 
 
+function buildFields(form: Record<string, string>) {
+  return [
+    form.firstName && form.lastName ? `Name: ${form.firstName} ${form.lastName}` : null,
+    form.grade ? `Grade: ${form.grade}` : null,
+    form.dob ? `Date of Birth: ${form.dob}` : null,
+    form.gender ? `Gender: ${form.gender}` : null,
+    form.email ? `Email: ${form.email}` : null,
+    form.fatherName ? `Father's Name: ${form.fatherName}` : null,
+    form.fatherOccupation ? `Father's Occupation: ${form.fatherOccupation}` : null,
+    form.motherName ? `Mother's Name: ${form.motherName}` : null,
+    form.motherOccupation ? `Mother's Occupation: ${form.motherOccupation}` : null,
+    form.address ? `Address: ${form.address}` : null,
+    form.parentPhone ? `Parent Phone: ${form.parentPhone}` : null,
+  ].filter(Boolean).join('\n')
+}
+
 const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
   { onBadgeClick, onShowDashboard, onUpdateStudent },
   ref
@@ -224,26 +241,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
 
   useImperativeHandle(ref, () => ({
     addStudentCreatedMessage(form: Record<string, string>) {
-      const fields = [
-        form.firstName && form.lastName ? `Name: ${form.firstName} ${form.lastName}` : null,
-        form.grade ? `Grade: ${form.grade}` : null,
-        form.dob ? `Date of Birth: ${form.dob}` : null,
-        form.gender ? `Gender: ${form.gender}` : null,
-        form.email ? `Email: ${form.email}` : null,
-        form.fatherName ? `Father's Name: ${form.fatherName}` : null,
-        form.fatherOccupation ? `Father's Occupation: ${form.fatherOccupation}` : null,
-        form.motherName ? `Mother's Name: ${form.motherName}` : null,
-        form.motherOccupation ? `Mother's Occupation: ${form.motherOccupation}` : null,
-        form.address ? `Address: ${form.address}` : null,
-        form.parentPhone ? `Parent Phone: ${form.parentPhone}` : null,
-      ].filter(Boolean).join('\n')
-
+      const fields = buildFields(form)
       const text = `✅ Student Created Successfully!\n\n${fields}`
-      setMessages(prev => [
-        ...prev,
-     
-        { id: ++msgId, role: 'assistant', text },
-      ])
+      setMessages(prev => [...prev, { id: ++msgId, role: 'assistant', text }])
+    },
+    addStudentUpdatedMessage(form: Record<string, string>) {
+      const fields = buildFields(form)
+      const text = `✅ Student Updated Successfully!\n\n${fields}`
+      setMessages(prev => [...prev, { id: ++msgId, role: 'assistant', text }])
     },
   }))
 

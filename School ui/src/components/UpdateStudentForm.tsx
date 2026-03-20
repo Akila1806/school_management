@@ -3,30 +3,36 @@ import styles from '../styles.module.css'
 
 const API = 'http://localhost:8000'
 
-const emptyForm = {
-  firstName: '', lastName: '', grade: '', dob: '', age: '',
-  gender: '', email: '',
-  fatherName: '', fatherOccupation: '',
-  motherName: '', motherOccupation: '',
-  address: '', parentPhone: '',
+type FormData = {
+  studentId: string
+  firstName: string
+  lastName: string
+  grade: string
+  dob: string
+  age: string
+  gender: string
+  email: string
+  fatherName: string
+  fatherOccupation: string
+  motherName: string
+  motherOccupation: string
+  address: string
+  parentPhone: string
 }
-
-type FormData = typeof emptyForm
 
 interface Props {
-  prefill?: FormData
-  onStudentCreated?: (form: Record<string, string>) => void
+  prefill: FormData
+  onStudentUpdated?: (form: Record<string, string>) => void
 }
 
-export default function StudentsSection({ prefill, onStudentCreated }: Props) {
-  const isUpdate = !!prefill
-  const [form, setForm] = useState<FormData>(prefill ?? emptyForm)
+export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) {
+  const [form, setForm] = useState<FormData>(prefill)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
 
   useEffect(() => {
-    if (prefill) setForm(prefill)
+    setForm(prefill)
   }, [prefill])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -69,29 +75,21 @@ export default function StudentsSection({ prefill, onStudentCreated }: Props) {
     if (!validate()) return
     setIsSubmitting(true)
     try {
-      const res = await fetch(`${API}/api/students`, {
-        method: 'POST',
+      const res = await fetch(`${API}/api/students/${form.studentId}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.detail || 'Save failed')
-      setSuccessMsg(`✅ ${form.firstName} ${form.lastName} saved successfully!`)
-      onStudentCreated?.(form as Record<string, string>)
-      setForm(emptyForm)
-      setErrors({})
+      if (!res.ok) throw new Error(json.detail || 'Update failed')
+      setSuccessMsg(`✅ ${form.firstName} ${form.lastName} updated successfully!`)
+      onStudentUpdated?.(form as Record<string, string>)
       setTimeout(() => setSuccessMsg(''), 4000)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error saving student'
+      const msg = err instanceof Error ? err.message : 'Error updating student'
       setErrors(prev => ({ ...prev, _api: msg }))
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  const handleReset = () => {
-    if (Object.values(form).some(v => v.trim())) {
-      if (confirm('Clear all fields?')) { setForm(emptyForm); setErrors({}) }
     }
   }
 
@@ -99,14 +97,10 @@ export default function StudentsSection({ prefill, onStudentCreated }: Props) {
     <div className={styles.studentsSection}>
       <div className={styles.header}>
         <div className={styles.headerContent}>
-          <div className={styles.headerIcon}>👤</div>
+          <div className={styles.headerIcon}>✏️</div>
           <div className={styles.headerText}>
-            <h1 className={styles.title}>{isUpdate ? 'Update Student' : 'Student Registration'}</h1>
-            <p className={styles.subtitle}>
-              {isUpdate
-                ? `Editing: ${form.firstName} ${form.lastName}`
-                : 'Add new students to the system'}
-            </p>
+            <h1 className={styles.title}>Update Student</h1>
+            <p className={styles.subtitle}>Editing: {form.firstName} {form.lastName}</p>
           </div>
         </div>
       </div>
@@ -152,7 +146,7 @@ export default function StudentsSection({ prefill, onStudentCreated }: Props) {
               </div>
               <div className={`${styles.formRow} ${styles.twoColumns}`}>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Gender  <span className={styles.requiredIndicator}>*</span></label>
+                  <label className={styles.fieldLabel}>Gender <span className={styles.requiredIndicator}>*</span></label>
                   <select className={styles.fieldSelect} name="gender" value={form.gender} onChange={handleChange}>
                     <option value="">Select gender</option>
                     <option value="Male">Male</option>
@@ -210,11 +204,16 @@ export default function StudentsSection({ prefill, onStudentCreated }: Props) {
             </div>
 
             <div className={styles.formActions}>
-              <button type="button" className={styles.resetButton} onClick={handleReset} disabled={isSubmitting}>Clear Form</button>
+              <button type="button" className={styles.resetButton} onClick={() => setForm(prefill)} disabled={isSubmitting}>
+                Reset
+              </button>
               <button type="submit" className={styles.saveButton} disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : isUpdate ? '✏️ Update Student' : '💾 Submit'}
+                {isSubmitting ? 'Updating...' : '✏️ Update Student'}
               </button>
             </div>
+
+            {successMsg && <div className={styles.successMessage}>{successMsg}</div>}
+            {errors._api && <div className={styles.fieldError}>{errors._api}</div>}
           </form>
         </div>
       </div>
