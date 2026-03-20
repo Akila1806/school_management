@@ -1,0 +1,56 @@
+.splitContainer {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.leftPanel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--main-bg);
+}
+
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border-color);
+}
+
+.resizer {
+  width: 4px;
+  background: var(--border-color);
+  cursor: col-resize;
+  position: relative;
+  flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+
+.resizer:hover {
+  background: var(--accent-color);
+}
+
+.resizerHandle {
+  position: absolute;
+  top: 0;
+  left: -2px;
+  right: -2px;
+  bottom: 0;
+  background: transparent;
+}
+
+.splitContainer.dragging .resizer {
+  background: var(--accent-color);
+}
+
+.splitContainer.dragging * {
+  pointer-events: none;
+}
+
+.splitContainer.dragging .resizer,
+.splitContainer.dragging .resizerHandle {
+  pointer-events: auto;
+}

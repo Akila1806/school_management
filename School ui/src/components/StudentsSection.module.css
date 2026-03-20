@@ -1,0 +1,396 @@
+/* Students Section Styles */
+.studentsSection {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--main-bg, #0f1117);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border-color, #2a2d3e);
+  background: var(--main-bg, #0f1117);
+  flex-shrink: 0;
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.headerIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent-color, #6366f1), #8b5cf6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary, #e2e8f0);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--text-muted, #64748b);
+  margin: 4px 0 0 0;
+}
+
+.statsCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--card-bg, #1a1d27);
+  border: 1px solid var(--border-color, #2a2d3e);
+  border-radius: 12px;
+  min-width: 100px;
+}
+
+.statsNumber {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent-color, #6366f1);
+  line-height: 1;
+}
+
+.statsLabel {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 24px;
+  padding: 24px 32px;
+}
+
+.formSection {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 12px;
+}
+
+.formSection::-webkit-scrollbar {
+  width: 6px;
+}
+
+.formSection::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.formSection::-webkit-scrollbar-thumb {
+  background: var(--border-color, #2a2d3e);
+  border-radius: 3px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 800px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #e2e8f0);
+  margin: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color, #2a2d3e);
+}
+
+.formRow {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+}
+
+.formRow.twoColumns {
+  grid-template-columns: 1fr 1fr;
+}
+
+.formRow.threeColumns {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.fieldInput,
+.fieldSelect,
+.fieldTextarea {
+  background: var(--input-bg, #0f1117);
+  border: 1px solid var(--input-border, #2a2d3e);
+  border-radius: 8px;
+  color: var(--text-primary, #e2e8f0);
+  font-size: 14px;
+  padding: 12px 16px;
+  outline: none;
+  transition: all 0.15s;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fieldInput:focus,
+.fieldSelect:focus,
+.fieldTextarea:focus {
+  border-color: var(--accent-color, #6366f1);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.fieldInput::placeholder,
+.fieldTextarea::placeholder {
+  color: var(--text-muted, #64748b);
+}
+
+.fieldInput[readonly] {
+  background: var(--sidebar-bg, #12151f);
+  color: var(--text-muted, #64748b);
+  cursor: not-allowed;
+}
+
+.fieldSelect {
+  cursor: pointer;
+}
+
+.fieldSelect option {
+  background: var(--card-bg, #1a1d27);
+  color: var(--text-primary, #e2e8f0);
+}
+
+.fieldTextarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.formActions {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color, #2a2d3e);
+}
+
+.resetButton {
+  background: none;
+  border: 1px solid var(--border-color, #2a2d3e);
+  border-radius: 8px;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.resetButton:hover {
+  border-color: var(--text-muted, #64748b);
+  color: var(--text-primary, #e2e8f0);
+}
+
+.saveButton {
+  background: var(--accent-color, #6366f1);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saveButton:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.saveButton:active {
+  transform: translateY(0);
+}
+
+.saveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.requiredIndicator {
+  color: #ef4444;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.fieldHint {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  margin-top: 4px;
+}
+
+.fieldError {
+  font-size: 11px;
+  color: #ef4444;
+  margin-top: 4px;
+}
+
+.studentsListSection {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.studentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.studentsList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.studentsList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.studentsList::-webkit-scrollbar-thumb {
+  background: var(--border-color, #2a2d3e);
+  border-radius: 3px;
+}
+
+.studentCard {
+  background: var(--card-bg, #1a1d27);
+  border: 1px solid var(--border-color, #2a2d3e);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.15s;
+}
+
+.studentCard:hover {
+  border-color: var(--accent-color, #6366f1);
+  transform: translateY(-1px);
+}
+
+.studentInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.studentName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #e2e8f0);
+  margin: 0;
+}
+
+.studentDetails {
+  font-size: 12px;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+}
+
+.studentDate {
+  font-size: 11px;
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .content {
+    flex-direction: column;
+    gap: 24px;
+  }
+  
+  .studentsListSection {
+    width: 100%;
+    max-height: 300px;
+  }
+  
+  .studentsList {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 8px;
+  }
+  
+  .studentCard {
+    min-width: 200px;
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .formRow.twoColumns,
+  .formRow.threeColumns {
+    grid-template-columns: 1fr;
+  }
+  
+  .header {
+    padding: 16px 20px;
+  }
+  
+  .content {
+    padding: 16px 20px;
+  }
+  
+  .formActions {
+    flex-direction: column;
+  }
+  
+  .resetButton,
+  .saveButton {
+    width: 100%;
+    justify-content: center;
+  }
+}

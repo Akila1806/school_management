@@ -1,0 +1,148 @@
+/* Theme Variables */
+:root {
+  /* Light Theme */
+  --main-bg: #ffffff;
+  --panel-bg: #f8f9fa;
+  --tab-bar-bg: #f1f3f4;
+  --tab-bg: #e8eaed;
+  --tab-hover-bg: #dadce0;
+  --tab-active-bg: #ffffff;
+  --tab-text: #5f6368;
+  --tab-hover-text: #202124;
+  --tab-active-text: #1a73e8;
+  --border-color: #dadce0;
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --text-muted: #9aa0a6;
+  --accent-color: #1a73e8;
+  --button-hover-bg: #f1f3f4;
+  --close-button-hover-bg: #f1f3f4;
+  --close-button-hover-text: #d93025;
+  --card-bg: #ffffff;
+  --input-bg: #ffffff;
+  --input-border: #dadce0;
+  --sidebar-bg: #f8f9fa;
+  --sidebar-hover: #f1f3f4;
+  --sidebar-active: #e8f0fe;
+}
+
+[data-theme="dark"] {
+  /* Dark Theme */
+  --main-bg: #0f1117;
+  --panel-bg: #12151f;
+  --tab-bar-bg: #1a1d27;
+  --tab-bg: #12151f;
+  --tab-hover-bg: #1e2129;
+  --tab-active-bg: #0f1117;
+  --tab-text: #94a3b8;
+  --tab-hover-text: #e2e8f0;
+  --tab-active-text: #a5b4fc;
+  --border-color: #2a2d3e;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-color: #6366f1;
+  --button-hover-bg: #1e2129;
+  --close-button-hover-bg: #2a2d3e;
+  --close-button-hover-text: #f87171;
+  --card-bg: #1a1d27;
+  --input-bg: #0f1117;
+  --input-border: #2a2d3e;
+  --sidebar-bg: #12151f;
+  --sidebar-hover: #1a1d27;
+  --sidebar-active: #1e1b4b;
+}
+
+/* Smooth transitions for theme changes */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Base styles that use theme variables */
+body {
+  background: var(--main-bg);
+  color: var(--text-primary);
+}
+
+/* Update existing styles to use theme variables */
+.layout {
+  background: var(--main-bg);
+}
+
+.sidebar {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+}
+
+.navItem {
+  color: var(--text-secondary);
+}
+
+.navItem:hover {
+  background: var(--sidebar-hover);
+  color: var(--text-primary);
+}
+
+.navItem.active {
+  background: var(--sidebar-active);
+  color: var(--accent-color);
+}
+
+.panel {
+  background: var(--panel-bg);
+  border-left: 1px solid var(--border-color);
+}
+
+.dashboard {
+  background: var(--main-bg);
+}
+
+.dashTitle {
+  color: var(--text-primary);
+}
+
+.statCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+
+.chartCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+
+.formCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+
+.field input,
+.field select,
+.field textarea {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent-color);
+}
+
+.chatInput {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-primary);
+}
+
+.chatInput:focus {
+  border-color: var(--accent-color);
+}
+
+/* Fix: user message text invisible in light/white theme */
+.message.user .bubble p {
+  color: var(--text-primary) !important;
+  background: var(--sidebar-active) !important;
+  border-color: var(--border-color) !important;
+}

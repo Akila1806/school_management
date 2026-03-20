@@ -1,0 +1,232 @@
+import { useState, useRef, useEffect } from 'react'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { useTheme } from '@/contexts/ThemeContext'
+import Dashboard from '@/components/Dashboard'
+import StudentsSection from '@/components/StudentsSection'
+import ChatPanel, { ChatPanelHandle } from '@/components/ChatPanel'
+import TabBar, { Tab } from '@/components/TabBar'
+import SplitLayout from '@/components/SplitLayout'
+import styles from '@/styles.module.css'
+
+let studentTabCounter = 0
+
+function rowToForm(row: Record<string, unknown>) {
+  const dob = String(row.dob ?? '')
+  const dobFormatted = dob ? dob.split('T')[0] : ''
+  let age = ''
+  if (dobFormatted) {
+    const birth = new Date(dobFormatted)
+    const today = new Date()
+    let a = today.getFullYear() - birth.getFullYear()
+    const m = today.getMonth() - birth.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) a--
+    age = String(Math.max(0, a))
+  }
+  return {
+    firstName: String(row.first_name ?? ''),
+    lastName: String(row.last_name ?? ''),
+    grade: String(row.grade_level ?? ''),
+    dob: dobFormatted,
+    age,
+    gender: String(row.gender ?? ''),
+    email: String(row.email ?? ''),
+    fatherName: String(row.father_name ?? ''),
+    fatherOccupation: String(row.father_occupation ?? ''),
+    motherName: String(row.mother_name ?? ''),
+    motherOccupation: String(row.mother_occupation ?? ''),
+    address: String(row.address ?? ''),
+    parentPhone: String(row.parent_phone ?? ''),
+  }
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  )
+}
+
+function AppContent() {
+  const { theme, toggleTheme } = useTheme()
+  const [tabs, setTabs] = useState<Tab[]>([])
+  const [activeTab, setActiveTab] = useState('')
+  const [prefillMap, setPrefillMap] = useState<Record<string, ReturnType<typeof rowToForm>>>({})
+  const chatRef = useRef<ChatPanelHandle>(null)
+
+  // Auto-open dashboard on first load only (not on every refresh)
+  useEffect(() => {
+    const hasAutoOpened = sessionStorage.getItem('dashboardAutoOpened')
+    
+    if (!hasAutoOpened) {
+      const timer = setTimeout(() => {
+        handleShowDashboard()
+        sessionStorage.setItem('dashboardAutoOpened', 'true')
+      }, 500)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
+  const handleBadgeClick = (badge: string): boolean => {
+    if (badge === 'Create Student') {
+      const existing = tabs.find(tab => tab.title === 'Create Form')
+      if (existing) {
+        setActiveTab(existing.id)
+        return true // already existed
+      }
+      const newTabId = `student-${++studentTabCounter}`
+      setTabs(prev => [...prev, { id: newTabId, title: 'Create Form', icon: '👤', closable: true, modified: false }])
+      setActiveTab(newTabId)
+      return false // newly opened
+    }
+    return false
+  }
+
+  const handleStudentCreated = (form: Record<string, string>) => {
+    chatRef.current?.addStudentCreatedMessage(form)
+  }
+
+  const handleUpdateStudent = (row: Record<string, unknown>) => {    const tabId = `student-${++studentTabCounter}`
+    const name = `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim()
+    const newTab: Tab = {
+      id: tabId,
+      title: name || 'Update Student',
+      icon: '✏️',
+      closable: true,
+      modified: false,
+    }
+    setPrefillMap(prev => ({ ...prev, [tabId]: rowToForm(row) }))
+    setTabs(prev => [...prev, newTab])
+    setActiveTab(tabId)
+  }
+
+  const handleShowDashboard = () => {
+    // Check if dashboard tab already exists
+    const existingDashboard = tabs.find(tab => tab.id === 'dashboard')
+    
+    if (existingDashboard) {
+      // If dashboard exists, just switch to it
+      setActiveTab('dashboard')
+    } else {
+      // Create new dashboard tab
+      const dashboardTab: Tab = {
+        id: 'dashboard',
+        title: 'Dashboard',
+        icon: '📊',
+        closable: true,
+        modified: false
+      }
+      setTabs(prev => [...prev, dashboardTab])
+      setActiveTab('dashboard')
+    }
+  }
+
+  const handleTabSelect = (tabId: string) => {
+    setActiveTab(tabId)
+  }
+
+  const handleTabClose = (tabId: string) => {
+    // Close the tab
+    setTabs(prev => prev.filter(tab => tab.id !== tabId))
+    
+    // If closing active tab, switch to the first available tab or show greeting screen
+    if (activeTab === tabId) {
+      const remainingTabs = tabs.filter(tab => tab.id !== tabId)
+      if (remainingTabs.length > 0) {
+        setActiveTab(remainingTabs[0].id)
+      } else {
+        // If no tabs remain, set activeTab to empty to show greeting screen
+        setActiveTab('')
+      }
+    }
+  }
+
+  const renderMainContent = () => {
+    if (activeTab === 'dashboard') {
+      return <Dashboard />
+    } else if (activeTab.startsWith('student-')) {
+      return <StudentsSection prefill={prefillMap[activeTab]} onStudentCreated={handleStudentCreated} />
+    } else if (activeTab === '' || tabs.length === 0) {
+      // Show greeting screen when no tabs are open
+      return (
+        <div className={styles.greetingScreen}>
+          <div className={styles.greetingContent}>
+            <div className={styles.greetingIcon}>🎓</div>
+            <h1 className={styles.greetingTitle}>Welcome to School Management System</h1>
+            <p className={styles.greetingSubtitle}>
+              Your comprehensive solution for managing student information and school operations
+            </p>
+       
+            <div className={styles.greetingHint}>
+              <p>You can also use the AI assistant in the chat panel to get started →</p>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    // Fallback to greeting screen
+    return (
+      <div className={styles.greetingScreen}>
+        <div className={styles.greetingContent}>
+          <div className={styles.greetingIcon}>🎓</div>
+          <h1 className={styles.greetingTitle}>Welcome Back!</h1>
+          <p className={styles.greetingSubtitle}>Select an option to continue</p>
+          <div className={styles.greetingActions}>
+            <button 
+              className={styles.greetingButton}
+              onClick={handleShowDashboard}
+            >
+              📊 Open Dashboard
+            </button>
+            <button 
+              className={styles.greetingButton}
+              onClick={() => handleBadgeClick('Create Student')}
+            >
+              👤 Create Student
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const leftPanel = (
+    <div className={styles.mainPanel}>
+      {tabs.length > 0 && (
+        <TabBar
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabSelect={handleTabSelect}
+          onTabClose={handleTabClose}
+        />
+      )}
+      <div className={styles.tabContent}>
+        {renderMainContent()}
+      </div>
+    </div>
+  )
+
+  const rightPanel = (
+    <ChatPanel ref={chatRef} onBadgeClick={handleBadgeClick} onShowDashboard={handleShowDashboard} onUpdateStudent={handleUpdateStudent} />
+  )
+
+  return (
+    <div className={styles.layout}>
+      <button
+        className={styles.globalThemeToggle}
+        onClick={toggleTheme}
+        title={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+      >
+        {theme === 'light' ? '🌙' : '☀️'}
+      </button>
+      <SplitLayout
+        leftPanel={leftPanel}
+        rightPanel={rightPanel}
+        initialSplit={70}
+        minLeftWidth={400}
+        minRightWidth={300}
+      />
+    </div>
+  )
+}

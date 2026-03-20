@@ -1,0 +1,152 @@
+const { generateSql, summarizeData } = require('../services/groqService')
+const { mcpQueryDatabase } = require('../services/mcpClient')
+const { sanitizeSql } = require('../utils/sanitizeSql')
+const ExcelJS = require('exceljs')
+
+/**
+ * Convert form data to natural language prompt
+ */
+function formDataToPrompt(data) {
+  const parts = []
+  
+  if (data.fullName) {
+    const [firstName, ...lastNameParts] = data.fullName.trim().split(/\s+/)
+    const lastName = lastNameParts.join(' ') || 'Unknown'
+    parts.push(`add a new student named ${firstName} ${lastName}`)
+  }
+  
+  if (data.dob) {
+    parts.push(`born on ${data.dob}`)
+  }
+  
+  if (data.grade) {
+    parts.push(`in ${data.grade}`)
+  }
+  
+  if (data.fatherName) {
+    parts.push(`father's name is ${data.fatherName}`)
+  }
+  
+  if (data.fatherOccupation) {
+    parts.push(`father's occupation is ${data.fatherOccupation}`)
+  }
+  
+  if (data.motherName) {
+    parts.push(`mother's name is ${data.motherName}`)
+  }
+  
+  if (data.motherOccupation) {
+    parts.push(`mother's occupation is ${data.motherOccupation}`)
+  }
+  
+  if (data.address) {
+    parts.push(`address is ${data.address}`)
+  }
+  
+  if (data.parentPhone) {
+    parts.push(`parent phone is ${data.parentPhone}`)
+  }
+  
+  return parts.join(', ')
+}
+
+async function agent(req, res) {
+  let prompt = (req.body.message || '').trim()
+  
+  if (!prompt && req.body.fullName) {
+    prompt = formDataToPrompt(req.body)
+  }
+  
+  if (!prompt) return res.status(400).json({ detail: 'Message cannot be empty' })
+
+  try {
+    const rawSql = await generateSql(prompt)
+    console.log("Generated SQL:", rawSql)
+    const sql = sanitizeSql(rawSql)
+    console.log("Sanitized SQL:", sql)
+    const rows = await mcpQueryDatabase(sql)
+    console.log("Query Result:", rows)
+
+    // For multi-row results, skip AI summarizer — render as table in frontend
+    if (Array.isArray(rows) && rows.length > 1) {
+      const isAllStudents = /all\s+students|list.*students|show.*students/i.test(prompt)
+      const message = isAllStudents
+        ? `Here are all ${rows.length} students currently enrolled in the system.`
+        : `Here are the ${rows.length} results matching your query.`
+      return res.json({ analysis: message, data: rows, sql })
+    }
+
+    const analysis = await summarizeData(prompt, JSON.stringify(rows, null, 2))
+    console.log("Data Analysis:", analysis)
+    res.json({ analysis, data: rows, sql })
+  } catch (err) {
+    const detail = err.response?.data?.error?.message || err.message
+    console.error('Agent error:', detail)
+    res.status(500).json({ detail })
+  }
+}
+
+async function exportExcel(req, res) {
+  const prompt = (req.body.message || '').trim()
+  console.log("Prompt",prompt);
+  if (!prompt) return res.status(400).json({ detail: 'Message cannot be empty' })
+
+  try {
+    const rawSql = await generateSql(prompt)
+    console.log("rawsql",rawSql);
+    const sql = sanitizeSql(rawSql)
+    console.log("sql",sql);
+    const rows = await mcpQueryDatabase(sql)
+    console.log("rows",rows);
+
+    if (!rows.length) return res.status(404).json({ detail: 'No data found to export' })
+
+    const workbook = new ExcelJS.Workbook()
+    const sheet = workbook.addWorksheet('Results')
+
+    const headers = Object.keys(rows[0])
+    sheet.addRow(headers.map(h => h.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())))
+    const headerRow = sheet.getRow(1)
+    headerRow.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      cell.alignment = { horizontal: 'center' }
+    })
+
+    // Data rows
+    for (const row of rows) {
+      sheet.addRow(headers.map(h => {
+        const v = row[h]
+        if (v === null || v === undefined) return ''
+        // Format ISO datetime strings as DD/MM/YYYY
+        if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) {
+          const d = new Date(v)
+          return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+        }
+        if (v instanceof Date) {
+          return `${String(v.getDate()).padStart(2,'0')}/${String(v.getMonth()+1).padStart(2,'0')}/${v.getFullYear()}`
+        }
+        return String(v)
+      }))
+    }
+
+    sheet.columns.forEach(col => {
+      let maxLen = 10
+      col.eachCell(cell => {
+        const len = cell.value ? String(cell.value).length : 0
+        if (len > maxLen) maxLen = len
+      })
+      col.width = Math.min(maxLen + 4, 40)
+    })
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', 'attachment; filename=results.xlsx')
+    await workbook.xlsx.write(res)
+    res.end()
+  } catch (err) {
+    console.error('Export error:', err.message)
+    res.status(500).json({ detail: err.message })
+  }
+}
+
+module.exports = { agent, exportExcel }
