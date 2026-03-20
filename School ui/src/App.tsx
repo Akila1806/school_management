@@ -49,16 +49,34 @@ export default function App() {
 
 function AppContent() {
   const { theme, toggleTheme } = useTheme()
-  const [tabs, setTabs] = useState<Tab[]>([])
-  const [activeTab, setActiveTab] = useState('')
+  const [tabs, setTabs] = useState<Tab[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('openTabs')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return sessionStorage.getItem('activeTab') || ''
+  })
   const [prefillMap, setPrefillMap] = useState<Record<string, ReturnType<typeof rowToForm>>>({})
   const chatRef = useRef<ChatPanelHandle>(null)
+
+  // Persist tabs and activeTab to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('openTabs', JSON.stringify(tabs))
+  }, [tabs])
+
+  useEffect(() => {
+    sessionStorage.setItem('activeTab', activeTab)
+  }, [activeTab])
 
   // Auto-open dashboard on first load only (not on every refresh)
   useEffect(() => {
     const hasAutoOpened = sessionStorage.getItem('dashboardAutoOpened')
+    const hasSavedTabs = sessionStorage.getItem('openTabs')
+    const savedTabs = hasSavedTabs ? JSON.parse(hasSavedTabs) : []
     
-    if (!hasAutoOpened) {
+    if (!hasAutoOpened && savedTabs.length === 0) {
       const timer = setTimeout(() => {
         handleShowDashboard()
         sessionStorage.setItem('dashboardAutoOpened', 'true')
