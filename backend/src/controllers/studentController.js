@@ -7,53 +7,62 @@ const { sanitizeSql } = require('../utils/sanitizeSql')
  * Accepts JSON form data and analyzes it with AI agent before inserting
  * All database interactions go through MCP
  */
+
 async function handleStudentRequest(req, res) {
-  const formData = req.body
+  let studentData = req.body
 
   try {
-    const currentDate = new Date().toISOString().split('T')[0]
-
-    const email =
-      formData.email ||
-      `${formData.firstName}.${formData.lastName}@school.edu`.toLowerCase()
-
-    const structuredData = {
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      dob: formData.dob,
-      grade_level: formData.grade,
-      gender: formData.gender,
-      email,
-      father_name: formData.fatherName,
-      father_occupation: formData.fatherOccupation,
-      mother_name: formData.motherName,
-      mother_occupation: formData.motherOccupation,
-      address: formData.address,
-      parent_phone: formData.parentPhone,
-      enrollment_date: currentDate
-    }
-
-    const studentSchema = { table: "students", fields: Object.keys(structuredData) }
 
     const prompt = `
-    Schema: ${JSON.stringify(studentSchema)}
-    Data: ${JSON.stringify(structuredData)}
+Generate a PostgreSQL INSERT query for the students table.
 
-    Generate INSERT SQL with ON CONFLICT (email) DO NOTHING RETURNING *;
-    `
+DATA (JSON):
+${JSON.stringify(studentData, null, 2)}
+
+RULES:
+- Use ONLY keys with non-null values
+- Do NOT include student_id
+- Do NOT include email
+- Convert dob to YYYY-MM-DD
+- Map camelCase JSON keys to snake_case DB columns
+- Do NOT insert "Not provided" or null values
+- Output ONLY SQL
+
+FORMAT:
+INSERT INTO students (columns...) VALUES (values...) RETURNING *;
+`
 
     const rawSql = await generateSql(prompt)
     const sql = sanitizeSql(rawSql)
 
-    if (!sql.toLowerCase().includes("insert into students")) {
-      return res.status(400).json({ error: "Invalid SQL generated" })
+    const rows = await mcpQueryDatabase(sql)
+
+    if (!rows || rows.length === 0) {
+      return res.status(400).json({ error: "Insert failed" })
     }
 
-    const rows = await mcpQueryDatabase(sql)
+    const student = rows[0]
+    const first = (student.first_name || 'student')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+
+    const last = (student.last_name || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+
+    const email = `${first}.${last}.${student.student_id}@school.edu`
+    const updateSql = `
+      UPDATE students
+      SET email = '${email}'
+      WHERE student_id = ${student.student_id}
+      RETURNING *;
+    `
+
+    const updatedRows = await mcpQueryDatabase(updateSql)
 
     res.json({
       success: true,
-      data: rows
+      data: updatedRows
     })
 
   } catch (err) {
@@ -83,71 +92,39 @@ async function getStudents(req, res) {
  */
 async function updateStudent(req, res) {
   const { id } = req.params
-  const formData = req.body
+  let studentData = req.body
 
   if (!id) {
     return res.status(400).json({ detail: 'Student ID is required' })
   }
 
-  if (!formData || typeof formData !== 'object') {
+  if (!studentData || typeof studentData !== 'object') {
     return res.status(400).json({ detail: 'Form data is required' })
   }
 
   try {
-    const email =
-      formData.email ||
-      `${(formData.firstName || 'student')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '')}.${(formData.lastName || 'user')
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '')
-      }@school.edu`
+const prompt = `
+Generate a PostgreSQL UPDATE query for the students table.
 
-    const structuredData = {
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      dob: formData.dob,
-      grade_level: formData.grade,
-      gender: formData.gender,
-      email,
-      father_name: formData.fatherName,
-      father_occupation: formData.fatherOccupation,
-      mother_name: formData.motherName,
-      mother_occupation: formData.motherOccupation,
-      address: formData.address,
-      parent_phone: formData.parentPhone
-    }
+DATA (JSON):
+${JSON.stringify(studentData, null, 2)}
 
-    Object.keys(structuredData).forEach(
-      key => structuredData[key] === undefined && delete structuredData[key]
-    )
+CONDITION:
+student_id = ${id}
 
-    const studentSchema = {
-      table: "students",
-      allowedFields: Object.keys(structuredData),
-      where: "student_id"
-    }
+RULES:
+- Use ONLY keys with non-null values
+- Do NOT include student_id in SET
+- Do NOT include email
+- Convert dob to YYYY-MM-DD
+- Map camelCase JSON keys to snake_case DB columns
+- Do NOT insert "Not provided" or null values
+- Must include WHERE student_id = ${id}
+- Output ONLY SQL
 
-    const prompt = `
-    You are a SQL generator.
-
-    Schema:
-    ${JSON.stringify(studentSchema, null, 2)}
-
-    Data:
-    ${JSON.stringify(structuredData, null, 2)}
-
-    Condition:
-    student_id = ${id}
-
-    Task:
-    Generate a safe UPDATE SQL query.
-    - Use only given fields
-    - Do not add extra columns
-    - Do not modify other tables
-    - Must include WHERE student_id = ${id}
-    - Add RETURNING *;
-    `
+FORMAT:
+UPDATE students SET column=value,... WHERE student_id = ${id} RETURNING *;
+`
 
     const rawSql = await generateSql(prompt)
     console.log("Generated UPDATE SQL:", rawSql)
@@ -155,11 +132,12 @@ async function updateStudent(req, res) {
     const sql = sanitizeSql(rawSql)
     console.log("Sanitized UPDATE SQL:", sql)
 
-    const normalized = sql.toLowerCase()
+    console.log("Generated UPDATE SQL:", sql)
 
+    const lower = sql.toLowerCase()
     if (
-      !normalized.startsWith("update students") ||
-      !normalized.includes(`where student_id = ${id}`)
+      !lower.startsWith("update students") ||
+      !lower.includes(`where student_id = ${id}`)
     ) {
       return res.status(400).json({
         error: "Invalid SQL generated"
@@ -174,14 +152,35 @@ async function updateStudent(req, res) {
       })
     }
 
+    const student = rows[0]
+
+    const first = (student.first_name || 'student')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+
+    const last = (student.last_name || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+
+    const email = `${first}.${last}.${student.student_id}@school.edu`
+
+    const updateEmailSql = `
+      UPDATE students
+      SET email = '${email}'
+      WHERE student_id = ${student.student_id}
+      RETURNING *;
+    `
+
+    const updatedRows = await mcpQueryDatabase(updateEmailSql)
+
     res.json({
       success: true,
       message: "Student updated successfully",
       data: {
-        studentId: rows[0].student_id,
-        fullName: `${rows[0].first_name} ${rows[0].last_name}`,
-        grade: rows[0].grade_level,
-        email: rows[0].email
+        studentId: updatedRows[0].student_id,
+        fullName: `${updatedRows[0].first_name} ${updatedRows[0].last_name}`,
+        grade: updatedRows[0].grade_level,
+        email: updatedRows[0].email
       }
     })
 

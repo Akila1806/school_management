@@ -165,7 +165,7 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
                 </div>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Email</label>
-                  <input className={styles.fieldInput} name="email" value={form.email} onChange={handleChange} placeholder="student@school.edu" type="email" disabled={isUpdated} />
+                  <input className={styles.fieldInput} name="email" value={form.email} onChange={handleChange} placeholder="student@school.edu" type="email" disabled />
                 </div>
               </div>
             </div>
