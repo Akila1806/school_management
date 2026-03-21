@@ -60,7 +60,12 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<string>(() => {
     return sessionStorage.getItem('activeTab') || ''
   })
-  const [prefillMap, setPrefillMap] = useState<Record<string, ReturnType<typeof rowToForm>>>({})
+  const [prefillMap, setPrefillMap] = useState<Record<string, ReturnType<typeof rowToForm>>>(() => {
+    try {
+      const saved = sessionStorage.getItem('prefillMap')
+      return saved ? JSON.parse(saved) : {}
+    } catch { return {} }
+  })
   const chatRef = useRef<ChatPanelHandle>(null)
 
   // Persist tabs and activeTab to sessionStorage
@@ -71,6 +76,10 @@ function AppContent() {
   useEffect(() => {
     sessionStorage.setItem('activeTab', activeTab)
   }, [activeTab])
+
+  useEffect(() => {
+    sessionStorage.setItem('prefillMap', JSON.stringify(prefillMap))
+  }, [prefillMap])
 
   // Auto-open dashboard on first load only (not on every refresh)
   useEffect(() => {
@@ -151,18 +160,13 @@ function AppContent() {
   }
 
   const handleTabClose = (tabId: string) => {
-    // Close the tab
     setTabs(prev => prev.filter(tab => tab.id !== tabId))
-    
-    // If closing active tab, switch to the first available tab or show greeting screen
+    if (tabId.startsWith('student-')) {
+      setPrefillMap(prev => { const next = { ...prev }; delete next[tabId]; return next })
+    }
     if (activeTab === tabId) {
       const remainingTabs = tabs.filter(tab => tab.id !== tabId)
-      if (remainingTabs.length > 0) {
-        setActiveTab(remainingTabs[0].id)
-      } else {
-        // If no tabs remain, set activeTab to empty to show greeting screen
-        setActiveTab('')
-      }
+      setActiveTab(remainingTabs.length > 0 ? remainingTabs[0].id : '')
     }
   }
 

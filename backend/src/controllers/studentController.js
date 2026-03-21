@@ -10,67 +10,54 @@ const { sanitizeSql } = require('../utils/sanitizeSql')
 async function handleStudentRequest(req, res) {
   const formData = req.body
 
-  if (!formData || typeof formData !== 'object') {
-    return res.status(400).json({ detail: 'Form data is required' })
-  }
-
   try {
-    console.log('Processing student data:', formData)
-
     const currentDate = new Date().toISOString().split('T')[0]
 
-    // Auto-generate email from name if not provided
-    const email = formData.email ||
-      `${(formData.firstName || 'student').toLowerCase().replace(/[^a-z0-9]/g, '')}.${(formData.lastName || 'user').toLowerCase().replace(/[^a-z0-9]/g, '')}@school.edu`
+    const email =
+      formData.email ||
+      `${formData.firstName}.${formData.lastName}@school.edu`.toLowerCase()
 
-    const prompt = `Insert a new student with the following information:
-- First Name: ${formData.firstName || 'Not provided'}
-- Last Name: ${formData.lastName || 'Not provided'}
-- Date of Birth: ${formData.dob || 'Not provided'}
-- Grade: ${formData.grade || 'Not provided'}
-- Gender: ${formData.gender || 'Not provided'}
-- Email: ${email}
-- Father's Name: ${formData.fatherName || 'Not provided'}
-- Father's Occupation: ${formData.fatherOccupation || 'Not provided'}
-- Mother's Name: ${formData.motherName || 'Not provided'}
-- Mother's Occupation: ${formData.motherOccupation || 'Not provided'}
-- Address: ${formData.address || 'Not provided'}
-- Parent Phone: ${formData.parentPhone || 'Not provided'}
-- Enrollment Date: ${currentDate}
-
-IMPORTANT: Generate an INSERT SQL statement. Do NOT include student_id (auto-increment).
-Add ON CONFLICT (email) DO NOTHING RETURNING * at the end.
-Use this exact format:
-INSERT INTO students (columns...) VALUES (values...) ON CONFLICT (email) DO NOTHING RETURNING *;`
-
-    console.log('Generated prompt:', prompt)
-
-    // Check if student already exists
-    const checkSql = `SELECT COUNT(*) as count FROM students WHERE first_name ILIKE '${formData.firstName}' AND last_name ILIKE '${formData.lastName}'`
-    const existingStudents = await mcpQueryDatabase(checkSql)
-
-    if (existingStudents && existingStudents.length > 0 && existingStudents[0].count > 0) {
-      return res.status(409).json({
-        detail: `Student "${formData.firstName} ${formData.lastName}" already exists`,
-      })
+    const structuredData = {
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      dob: formData.dob,
+      grade_level: formData.grade,
+      gender: formData.gender,
+      email,
+      father_name: formData.fatherName,
+      father_occupation: formData.fatherOccupation,
+      mother_name: formData.motherName,
+      mother_occupation: formData.motherOccupation,
+      address: formData.address,
+      parent_phone: formData.parentPhone,
+      enrollment_date: currentDate
     }
 
-    const rawSql = await generateSql(prompt)
-    console.log('Generated SQL:', rawSql)
+    const studentSchema = { table: "students", fields: Object.keys(structuredData) }
 
+    const prompt = `
+    Schema: ${JSON.stringify(studentSchema)}
+    Data: ${JSON.stringify(structuredData)}
+
+    Generate INSERT SQL with ON CONFLICT (email) DO NOTHING RETURNING *;
+    `
+
+    const rawSql = await generateSql(prompt)
     const sql = sanitizeSql(rawSql)
-    console.log('Sanitized SQL:', sql)
+
+    if (!sql.toLowerCase().includes("insert into students")) {
+      return res.status(400).json({ error: "Invalid SQL generated" })
+    }
 
     const rows = await mcpQueryDatabase(sql)
-    console.log('Query result:', rows)
 
-    const analysis = await summarizeData(prompt, JSON.stringify(rows, null, 2))
+    res.json({
+      success: true,
+      data: rows
+    })
 
-    res.json({ analysis, data: rows, sql })
   } catch (err) {
-    const detail = err.response?.data?.error?.message || err.message
-    console.error('Student request error:', detail)
-    res.status(500).json({ detail })
+    res.status(500).json({ error: err.message })
   }
 }
 
@@ -91,4 +78,118 @@ async function getStudents(req, res) {
   }
 }
 
-module.exports = { handleStudentRequest, getStudents }
+/**
+ * PUT /api/students/:id - update an existing student
+ */
+async function updateStudent(req, res) {
+  const { id } = req.params
+  const formData = req.body
+
+  if (!id) {
+    return res.status(400).json({ detail: 'Student ID is required' })
+  }
+
+  if (!formData || typeof formData !== 'object') {
+    return res.status(400).json({ detail: 'Form data is required' })
+  }
+
+  try {
+    const email =
+      formData.email ||
+      `${(formData.firstName || 'student')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')}.${(formData.lastName || 'user')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+      }@school.edu`
+
+    const structuredData = {
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      dob: formData.dob,
+      grade_level: formData.grade,
+      gender: formData.gender,
+      email,
+      father_name: formData.fatherName,
+      father_occupation: formData.fatherOccupation,
+      mother_name: formData.motherName,
+      mother_occupation: formData.motherOccupation,
+      address: formData.address,
+      parent_phone: formData.parentPhone
+    }
+
+    Object.keys(structuredData).forEach(
+      key => structuredData[key] === undefined && delete structuredData[key]
+    )
+
+    const studentSchema = {
+      table: "students",
+      allowedFields: Object.keys(structuredData),
+      where: "student_id"
+    }
+
+    const prompt = `
+    You are a SQL generator.
+
+    Schema:
+    ${JSON.stringify(studentSchema, null, 2)}
+
+    Data:
+    ${JSON.stringify(structuredData, null, 2)}
+
+    Condition:
+    student_id = ${id}
+
+    Task:
+    Generate a safe UPDATE SQL query.
+    - Use only given fields
+    - Do not add extra columns
+    - Do not modify other tables
+    - Must include WHERE student_id = ${id}
+    - Add RETURNING *;
+    `
+
+    const rawSql = await generateSql(prompt)
+    console.log("Generated UPDATE SQL:", rawSql)
+
+    const sql = sanitizeSql(rawSql)
+    console.log("Sanitized UPDATE SQL:", sql)
+
+    const normalized = sql.toLowerCase()
+
+    if (
+      !normalized.startsWith("update students") ||
+      !normalized.includes(`where student_id = ${id}`)
+    ) {
+      return res.status(400).json({
+        error: "Invalid SQL generated"
+      })
+    }
+
+    const rows = await mcpQueryDatabase(sql)
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({
+        detail: `Student with ID ${id} not found`
+      })
+    }
+
+    res.json({
+      success: true,
+      message: "Student updated successfully",
+      data: {
+        studentId: rows[0].student_id,
+        fullName: `${rows[0].first_name} ${rows[0].last_name}`,
+        grade: rows[0].grade_level,
+        email: rows[0].email
+      }
+    })
+
+  } catch (err) {
+    const detail = err.response?.data?.error?.message || err.message
+    console.error("Update student error:", detail)
+    res.status(500).json({ detail })
+  }
+}
+
+module.exports = { handleStudentRequest, getStudents, updateStudent }

@@ -11,7 +11,9 @@ const PREDEFINED_QUERIES = {
   'count total number of students': 'SELECT COUNT(*) as count FROM students',
   'count male students': "SELECT COUNT(*) as count FROM students WHERE gender = 'Male'",
   'count female students': "SELECT COUNT(*) as count FROM students WHERE gender = 'Female'",
-  'get students grouped by grade level': 'SELECT grade_level, COUNT(*) as count FROM students GROUP BY grade_level ORDER BY grade_level'
+  'get students grouped by grade level': 'SELECT grade_level, COUNT(*) as count FROM students GROUP BY grade_level ORDER BY grade_level',
+  'get attendance summary by status': "SELECT status, COUNT(*) as count FROM attendance GROUP BY status ORDER BY status",
+  'get attendance by grade': "SELECT s.grade_level, a.status, COUNT(*) as count FROM attendance a JOIN students s ON a.student_id = s.student_id GROUP BY s.grade_level, a.status ORDER BY s.grade_level"
 }
 
 /**

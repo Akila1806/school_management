@@ -353,6 +353,17 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
       return
     }
 
+    // Detect attendance intent
+    if (/attend[a-z]*/i.test(trimmed)) {
+      onShowDashboard()
+      setMessages(prev => [
+        ...prev,
+        { id: ++msgId, role: 'user', text: trimmed },
+        { id: ++msgId, role: 'assistant', text: 'Opened the dashboard — scroll down to see the Attendance Overview chart.' },
+      ])
+      return
+    }
+
     sendToAgent(trimmed)
   }
 

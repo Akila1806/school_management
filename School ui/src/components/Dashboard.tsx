@@ -11,6 +11,7 @@ interface DashboardMetrics {
   femaleCount: number
   gradeDistribution: Array<{ name: string; value: number }>
   genderData: Array<{ name: string; value: number; fill: string }>
+  attendanceSummary: Array<{ name: string; value: number; fill: string }>
 }
 
 interface ApiResult {
@@ -30,6 +31,7 @@ export default function Dashboard() {
     femaleCount: 0,
     gradeDistribution: [],
     genderData: [],
+    attendanceSummary: [],
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,6 +57,7 @@ export default function Dashboard() {
               'count male students',
               'count female students',
               'get students grouped by grade level',
+              'get attendance summary by status',
             ]
           })
         })
@@ -109,12 +112,30 @@ export default function Dashboard() {
           { name: 'Female', value: Math.round((femaleCount / total) * 100), fill: '#ec4899' },
         ]
 
+        const ATTENDANCE_COLORS: Record<string, string> = {
+          present: '#10b981',
+          absent: '#ef4444',
+          late: '#f59e0b',
+          excused: '#6366f1',
+        }
+
+        const attendanceRaw = results['get attendance summary by status']?.data || []
+        const attendanceSummary = attendanceRaw.map((r) => {
+          const status = String(r.status ?? '').toLowerCase()
+          return {
+            name: status.charAt(0).toUpperCase() + status.slice(1),
+            value: parseInt(String(r.count ?? '0'), 10),
+            fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
+          }
+        })
+
         setMetrics({
           totalStudents,
           maleCount,
           femaleCount,
           gradeDistribution,
           genderData,
+          attendanceSummary,
         })
       } catch (err) {
         console.error('Dashboard API error:', err)
@@ -286,6 +307,55 @@ export default function Dashboard() {
               <Bar dataKey="value" fill="#6366f1" radius={[3, 3, 0, 0]} name="Students" />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+
+        <div className={styles.chartCard} style={{ gridColumn: '1 / -1' }}>
+          <h3 className={styles.chartTitle}>Attendance Overview</h3>
+          {metrics.attendanceSummary.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: 14 }}>
+              No attendance data available
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+              <ResponsiveContainer width="40%" height={180}>
+                <PieChart>
+                  <Pie
+                    data={metrics.attendanceSummary}
+                    cx="50%" cy="50%"
+                    innerRadius={45} outerRadius={75}
+                    paddingAngle={4}
+                    dataKey="value"
+                  >
+                    {metrics.attendanceSummary.map((entry, i) => (
+                      <Cell key={i} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: '#1e2130', border: '1px solid #3a3f55', borderRadius: 8 }}
+                    formatter={(v) => [v, 'Records']}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {metrics.attendanceSummary.map((item) => {
+                  const total = metrics.attendanceSummary.reduce((s, r) => s + r.value, 0)
+                  const pct = total > 0 ? Math.round((item.value / total) * 100) : 0
+                  return (
+                    <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: item.fill, flexShrink: 0 }} />
+                      <span style={{ color: '#e2e8f0', fontSize: 13, minWidth: 70 }}>{item.name}</span>
+                      <div style={{ flex: 1, background: '#2a2d3e', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: item.fill, borderRadius: 4, transition: 'width 0.6s ease' }} />
+                      </div>
+                      <span style={{ color: '#94a3b8', fontSize: 12, minWidth: 50, textAlign: 'right' }}>
+                        {item.value} ({pct}%)
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

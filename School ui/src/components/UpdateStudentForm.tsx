@@ -30,9 +30,13 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
+  const [isUpdated, setIsUpdated] = useState(false)
 
   useEffect(() => {
     setForm(prefill)
+    setIsUpdated(false)
+    setSuccessMsg('')
+    setErrors({})
   }, [prefill])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -72,6 +76,10 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isUpdated) {
+      setErrors(prev => ({ ...prev, _api: `${form.firstName} ${form.lastName} already updated. Load a new student to make changes.` }))
+      return
+    }
     if (!validate()) return
     setIsSubmitting(true)
     try {
@@ -83,8 +91,8 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
       const json = await res.json()
       if (!res.ok) throw new Error(json.detail || 'Update failed')
       setSuccessMsg(`✅ ${form.firstName} ${form.lastName} updated successfully!`)
+      setIsUpdated(true)
       onStudentUpdated?.(form as Record<string, string>)
-      setTimeout(() => setSuccessMsg(''), 4000)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error updating student'
       setErrors(prev => ({ ...prev, _api: msg }))
@@ -113,19 +121,19 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
               <div className={`${styles.formRow} ${styles.twoColumns}`}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>First Name <span className={styles.requiredIndicator}>*</span></label>
-                  <input className={styles.fieldInput} name="firstName" value={form.firstName} onChange={handleChange} placeholder="Enter first name" />
+                  <input className={styles.fieldInput} name="firstName" value={form.firstName} onChange={handleChange} placeholder="Enter first name" disabled={isUpdated} />
                   {errors.firstName && <div className={styles.fieldError}>{errors.firstName}</div>}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Last Name <span className={styles.requiredIndicator}>*</span></label>
-                  <input className={styles.fieldInput} name="lastName" value={form.lastName} onChange={handleChange} placeholder="Enter last name" />
+                  <input className={styles.fieldInput} name="lastName" value={form.lastName} onChange={handleChange} placeholder="Enter last name" disabled={isUpdated} />
                   {errors.lastName && <div className={styles.fieldError}>{errors.lastName}</div>}
                 </div>
               </div>
               <div className={`${styles.formRow} ${styles.threeColumns}`}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Grade <span className={styles.requiredIndicator}>*</span></label>
-                  <select className={styles.fieldSelect} name="grade" value={form.grade} onChange={handleChange}>
+                  <select className={styles.fieldSelect} name="grade" value={form.grade} onChange={handleChange} disabled={isUpdated}>
                     <option value="">Select grade</option>
                     {Array.from({ length: 12 }, (_, i) => (
                       <option key={i + 1} value={`Grade ${i + 1}`}>Grade {i + 1}</option>
@@ -135,7 +143,7 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
                 </div>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Date of Birth <span className={styles.requiredIndicator}>*</span></label>
-                  <input className={styles.fieldInput} type="date" name="dob" value={form.dob} onChange={handleChange} />
+                  <input className={styles.fieldInput} type="date" name="dob" value={form.dob} onChange={handleChange} disabled={isUpdated} />
                   {errors.dob && <div className={styles.fieldError}>{errors.dob}</div>}
                 </div>
                 <div className={styles.field}>
@@ -147,7 +155,7 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
               <div className={`${styles.formRow} ${styles.twoColumns}`}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Gender <span className={styles.requiredIndicator}>*</span></label>
-                  <select className={styles.fieldSelect} name="gender" value={form.gender} onChange={handleChange}>
+                  <select className={styles.fieldSelect} name="gender" value={form.gender} onChange={handleChange} disabled={isUpdated}>
                     <option value="">Select gender</option>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
@@ -157,7 +165,7 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
                 </div>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Email</label>
-                  <input className={styles.fieldInput} name="email" value={form.email} onChange={handleChange} placeholder="student@school.edu" type="email" />
+                  <input className={styles.fieldInput} name="email" value={form.email} onChange={handleChange} placeholder="student@school.edu" type="email" disabled={isUpdated} />
                 </div>
               </div>
             </div>
@@ -167,24 +175,24 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
               <div className={`${styles.formRow} ${styles.twoColumns}`}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Father's Name <span className={styles.requiredIndicator}>*</span></label>
-                  <input className={styles.fieldInput} name="fatherName" value={form.fatherName} onChange={handleChange} placeholder="Enter father's full name" />
+                  <input className={styles.fieldInput} name="fatherName" value={form.fatherName} onChange={handleChange} placeholder="Enter father's full name" disabled={isUpdated} />
                   {errors.fatherName && <div className={styles.fieldError}>{errors.fatherName}</div>}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Father's Occupation <span className={styles.requiredIndicator}>*</span></label>
-                  <input className={styles.fieldInput} name="fatherOccupation" value={form.fatherOccupation} onChange={handleChange} placeholder="e.g. Engineer" />
+                  <input className={styles.fieldInput} name="fatherOccupation" value={form.fatherOccupation} onChange={handleChange} placeholder="e.g. Engineer" disabled={isUpdated} />
                   {errors.fatherOccupation && <div className={styles.fieldError}>{errors.fatherOccupation}</div>}
                 </div>
               </div>
               <div className={`${styles.formRow} ${styles.twoColumns}`}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Mother's Name <span className={styles.requiredIndicator}>*</span></label>
-                  <input className={styles.fieldInput} name="motherName" value={form.motherName} onChange={handleChange} placeholder="Enter mother's full name" />
+                  <input className={styles.fieldInput} name="motherName" value={form.motherName} onChange={handleChange} placeholder="Enter mother's full name" disabled={isUpdated} />
                   {errors.motherName && <div className={styles.fieldError}>{errors.motherName}</div>}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Mother's Occupation</label>
-                  <input className={styles.fieldInput} name="motherOccupation" value={form.motherOccupation} onChange={handleChange} placeholder="e.g. Doctor" />
+                  <input className={styles.fieldInput} name="motherOccupation" value={form.motherOccupation} onChange={handleChange} placeholder="e.g. Doctor" disabled={isUpdated} />
                 </div>
               </div>
             </div>
@@ -193,26 +201,25 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
               <h3 className={styles.sectionTitle}>Contact Information</h3>
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>Address <span className={styles.requiredIndicator}>*</span></label>
-                <textarea className={styles.fieldTextarea} name="address" value={form.address} onChange={handleChange} placeholder="Enter full residential address" rows={2} />
+                <textarea className={styles.fieldTextarea} name="address" value={form.address} onChange={handleChange} placeholder="Enter full residential address" rows={2} disabled={isUpdated} />
                 {errors.address && <div className={styles.fieldError}>{errors.address}</div>}
               </div>
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>Parent Phone Number <span className={styles.requiredIndicator}>*</span></label>
-                <input className={styles.fieldInput} name="parentPhone" value={form.parentPhone} onChange={handleChange} placeholder="+1 (555) 000-0000" type="tel" />
+                <input className={styles.fieldInput} name="parentPhone" value={form.parentPhone} onChange={handleChange} placeholder="+1 (555) 000-0000" type="tel" disabled={isUpdated} />
                 {errors.parentPhone && <div className={styles.fieldError}>{errors.parentPhone}</div>}
               </div>
             </div>
 
             <div className={styles.formActions}>
-              <button type="button" className={styles.resetButton} onClick={() => setForm(prefill)} disabled={isSubmitting}>
+              <button type="button" className={styles.resetButton} onClick={() => { setForm(prefill); setIsUpdated(false); setSuccessMsg(''); setErrors({}) }} disabled={isSubmitting}>
                 Reset
               </button>
-              <button type="submit" className={styles.saveButton} disabled={isSubmitting}>
-                {isSubmitting ? 'Updating...' : '✏️ Update Student'}
+              <button type="submit" className={styles.saveButton} disabled={isSubmitting || isUpdated}>
+                {isSubmitting ? 'Updating...' : isUpdated ? '✅ Updated Students' : '✏️ Update Student'}
               </button>
             </div>
 
-            {successMsg && <div className={styles.successMessage}>{successMsg}</div>}
             {errors._api && <div className={styles.fieldError}>{errors._api}</div>}
           </form>
         </div>
