@@ -103,24 +103,41 @@ async function updateStudent(req, res) {
   }
 
   try {
-const prompt = `
-Generate a PostgreSQL UPDATE query for the students table.
 
-DATA (JSON):
-${JSON.stringify(studentData, null, 2)}
+    const normalizedData = Object.fromEntries(
+      Object.entries(studentData).map(([key, value]) => [
+        key.replace(/[A-Z]/g, l => `_${l.toLowerCase()}`),
+        value
+      ])
+    )
+
+    const prompt = `
+You are an expert PostgreSQL query generator.
+
+TASK:
+Generate a STRICT UPDATE query for the "students" table.
+
+INPUT DATA (JSON):
+${JSON.stringify(normalizedData, null, 2)}
 
 CONDITION:
 student_id = ${id}
 
-RULES:
-- Use ONLY keys with non-null values
-- Do NOT include student_id in SET
-- Do NOT include email
-- Convert dob to YYYY-MM-DD
-- Map camelCase JSON keys to snake_case DB columns
-- Do NOT insert "Not provided" or null values
-- Must include WHERE student_id = ${id}
-- Output ONLY SQL
+STRICT RULES:
+- Use ONLY keys with non-null, non-empty values
+- IGNORE null, undefined, empty string, "Not provided"
+- DO NOT include student_id in SET
+- DO NOT include email in SET
+- MUST include ALL valid fields from input (do NOT skip any)
+- Use EXACT column names as given in JSON (already snake_case)
+- Convert dob to YYYY-MM-DD if needed
+- Strings must be in single quotes
+- DO NOT generate empty SET clause
+- MUST include WHERE student_id = ${id}
+- MUST include RETURNING *
+
+OUTPUT:
+ONLY SQL query
 
 FORMAT:
 UPDATE students SET column=value,... WHERE student_id = ${id} RETURNING *;
@@ -129,15 +146,19 @@ UPDATE students SET column=value,... WHERE student_id = ${id} RETURNING *;
     const rawSql = await generateSql(prompt)
     console.log("Generated UPDATE SQL:", rawSql)
 
-    const sql = sanitizeSql(rawSql)
-    console.log("Sanitized UPDATE SQL:", sql)
+    let sql = sanitizeSql(rawSql)
 
-    console.log("Generated UPDATE SQL:", sql)
+    sql = sql.replace(/\bgrade\b/g, "grade_level")
+
+    console.log("Final Fixed SQL:", sql)
 
     const lower = sql.toLowerCase()
+
     if (
       !lower.startsWith("update students") ||
-      !lower.includes(`where student_id = ${id}`)
+      !lower.includes(`where student_id = ${id}`) ||
+      lower.includes("set ;") ||
+      lower.includes("set where")
     ) {
       return res.status(400).json({
         error: "Invalid SQL generated"

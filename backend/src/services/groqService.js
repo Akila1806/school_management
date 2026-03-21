@@ -63,7 +63,7 @@ CRITICAL UPDATE RULES:
 UPDATE FIELD MAPPING:
 - "email" → email
 - "grade" or "class" or "grade level" → grade_level (ALWAYS format as "Grade X" where X is the exact number provided)
-- "phone" or "contact" → parent_phone
+- "phone" or "contact" or "parent phone" or "father phone" or "mother phone" → parent_phone
 - "address" → address
 - "father name" → father_name
 - "mother name" → mother_name
@@ -92,12 +92,15 @@ CRITICAL RULE - SELECT ONLY NEEDED COLUMNS:
 - "student by name" or "show me X student details" or "details of X" → SELECT * FROM students WHERE ...
 - "all students" → SELECT first_name, last_name, gender, dob, email FROM students
 - "student email" → SELECT first_name, last_name, email FROM students
+- "phone" or "father phone" or "mother phone" or "parent phone" or "contact" → SELECT first_name, last_name, parent_phone FROM students
 - When the user asks for "details" of a specific student, ALWAYS use SELECT * to return all columns
 - Always include first_name and last_name for identification
 - Only add other columns if directly relevant to the question
+- NEVER use father_phone or mother_phone — the only phone column is parent_phone
 
 OTHER RULES:
 - Return ONLY the SQL string, nothing else.
+- NEVER add RETURNING * to SELECT queries — RETURNING is only for INSERT/UPDATE/DELETE
 - For name searches: WHERE first_name ILIKE '%name%' OR last_name ILIKE '%name%'
 - Always use ILIKE (case-insensitive) for all text searches.
 - For "eldest" or "oldest student": ORDER BY dob ASC LIMIT 1

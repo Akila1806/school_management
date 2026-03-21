@@ -12,6 +12,12 @@ function sanitizeSql(sql) {
     throw new Error('COPY TO FILE is not allowed. Use a SELECT query instead.')
   }
 
+  // Remove RETURNING * from SELECT queries — it's only valid for INSERT/UPDATE/DELETE
+  if (/^\s*SELECT\b/i.test(sql)) {
+    sql = sql.replace(/\s+RETURNING\s+\*\s*;?\s*$/i, '').trim()
+    if (!sql.endsWith(';')) sql += ';'
+  }
+
   // Patch missing NOT NULL columns on any INSERT INTO students
   if (/^\s*INSERT\s+INTO\s+students\b/i.test(sql)) {
     sql = ensureColumn(sql, 'enrollment_date', 'CURRENT_DATE')

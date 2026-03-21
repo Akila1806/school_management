@@ -212,7 +212,7 @@ export default function StudentsSection({ prefill, onStudentCreated }: Props) {
             <div className={styles.formActions}>
               <button type="button" className={styles.resetButton} onClick={handleReset} disabled={isSubmitting}>Clear Form</button>
               <button type="submit" className={styles.saveButton} disabled={isSubmitting}>
-                {isSubmitting ? 'Submitting...' : isUpdate ? '✏️ Update Student' : '💾 Submit'}
+                {isSubmitting ? 'Submitting...' : isUpdate ? '✏️ Update Student' : '💾 Save Student'}
               </button>
             </div>
           </form>

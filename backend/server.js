@@ -15,7 +15,7 @@ async function runMigrations() {
   const client = await pool.connect()
   try {
     await client.query(`ALTER TABLE students ALTER COLUMN email DROP NOT NULL`)
-    console.log('Migration: email column is now nullable')
+    // console.log('Migration: email column is now nullable')
   } catch (err) {
     // Already nullable or table not yet created — safe to ignore
     console.log('Migration note:', err.message)

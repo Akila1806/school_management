@@ -37,6 +37,10 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [attendanceView, setAttendanceView] = useState<'weekly' | 'monthly'>('weekly')
+  const [weeklyAttendance, setWeeklyAttendance] = useState<Array<{ name: string; value: number; fill: string }>>([])
+  const [monthlyAttendance, setMonthlyAttendance] = useState<Array<{ name: string; value: number; fill: string }>>([])
+
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -58,6 +62,8 @@ export default function Dashboard() {
               'count female students',
               'get students grouped by grade level',
               'get attendance summary by status',
+              'get weekly attendance summary',
+              'get last month attendance summary',
             ]
           })
         })
@@ -77,11 +83,12 @@ export default function Dashboard() {
         }
 
         // Check if any of the results have errors
-        const hasErrors = Object.values(results).some((result) => result.error)
-        if (hasErrors) {
-          const errorMessages = Object.entries(results)
-            .filter(([, result]) => result.error)
-            .map(([metric, result]) => `${metric}: ${result.error}`)
+        const criticalMetrics = ['count total number of students', 'count male students', 'count female students', 'get students grouped by grade level']
+        const hasCriticalErrors = criticalMetrics.some((m) => results[m]?.error)
+        if (hasCriticalErrors) {
+          const errorMessages = criticalMetrics
+            .filter((m) => results[m]?.error)
+            .map((m) => `${m}: ${results[m].error}`)
           throw new Error(`API errors: ${errorMessages.join(', ')}`)
         }
 
@@ -128,6 +135,29 @@ export default function Dashboard() {
             fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
           }
         })
+
+        const weeklyRaw = results['get weekly attendance summary']?.data || []
+        const weekly = weeklyRaw.map((r) => {
+          const status = String(r.status ?? '').toLowerCase()
+          return {
+            name: status.charAt(0).toUpperCase() + status.slice(1),
+            value: parseInt(String(r.count ?? '0'), 10),
+            fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
+          }
+        })
+
+        const monthlyRaw = results['get last month attendance summary']?.data || []
+        const monthly = monthlyRaw.map((r) => {
+          const status = String(r.status ?? '').toLowerCase()
+          return {
+            name: status.charAt(0).toUpperCase() + status.slice(1),
+            value: parseInt(String(r.count ?? '0'), 10),
+            fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
+          }
+        })
+
+        setWeeklyAttendance(weekly)
+        setMonthlyAttendance(monthly)
 
         setMetrics({
           totalStudents,
@@ -310,52 +340,68 @@ export default function Dashboard() {
         </div>
 
         <div className={styles.chartCard} style={{ gridColumn: '1 / -1' }}>
-          <h3 className={styles.chartTitle}>Attendance Overview</h3>
-          {metrics.attendanceSummary.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: 14 }}>
-              No attendance data available
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <h3 className={styles.chartTitle} style={{ margin: 0 }}>Attendance Overview</h3>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                onClick={() => setAttendanceView('weekly')}
+                style={{
+                  padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12,
+                  background: attendanceView === 'weekly' ? '#6366f1' : '#2a2d3e',
+                  color: attendanceView === 'weekly' ? '#fff' : '#94a3b8',
+                  fontWeight: attendanceView === 'weekly' ? 600 : 400,
+                }}
+              >Weekly</button>
+              <button
+                onClick={() => setAttendanceView('monthly')}
+                style={{
+                  padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12,
+                  background: attendanceView === 'monthly' ? '#6366f1' : '#2a2d3e',
+                  color: attendanceView === 'monthly' ? '#fff' : '#94a3b8',
+                  fontWeight: attendanceView === 'monthly' ? 600 : 400,
+                }}
+              >Last Month</button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-              <ResponsiveContainer width="40%" height={180}>
-                <PieChart>
-                  <Pie
-                    data={metrics.attendanceSummary}
-                    cx="50%" cy="50%"
-                    innerRadius={45} outerRadius={75}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {metrics.attendanceSummary.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ background: '#1e2130', border: '1px solid #3a3f55', borderRadius: 8 }}
-                    formatter={(v) => [v, 'Records']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {metrics.attendanceSummary.map((item) => {
-                  const total = metrics.attendanceSummary.reduce((s, r) => s + r.value, 0)
-                  const pct = total > 0 ? Math.round((item.value / total) * 100) : 0
-                  return (
-                    <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ width: 12, height: 12, borderRadius: '50%', background: item.fill, flexShrink: 0 }} />
-                      <span style={{ color: '#e2e8f0', fontSize: 13, minWidth: 70 }}>{item.name}</span>
-                      <div style={{ flex: 1, background: '#2a2d3e', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: item.fill, borderRadius: 4, transition: 'width 0.6s ease' }} />
-                      </div>
-                      <span style={{ color: '#94a3b8', fontSize: 12, minWidth: 50, textAlign: 'right' }}>
-                        {item.value} ({pct}%)
-                      </span>
-                    </div>
-                  )
-                })}
+          </div>
+          {(() => {
+            const activeData = attendanceView === 'weekly' ? weeklyAttendance : monthlyAttendance
+            return activeData.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: 14 }}>
+                No attendance data available for {attendanceView === 'weekly' ? 'this week' : 'last month'}
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                <ResponsiveContainer width="40%" height={180}>
+                  <PieChart>
+                    <Pie data={activeData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="value">
+                      {activeData.map((entry, i) => (
+                        <Cell key={i} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: '#1e2130', border: '1px solid #3a3f55', borderRadius: 8 }} formatter={(v) => [v, 'Records']} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {activeData.map((item) => {
+                    const total = activeData.reduce((s, r) => s + r.value, 0)
+                    const pct = total > 0 ? Math.round((item.value / total) * 100) : 0
+                    return (
+                      <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ width: 12, height: 12, borderRadius: '50%', background: item.fill, flexShrink: 0 }} />
+                        <span style={{ color: '#e2e8f0', fontSize: 13, minWidth: 70 }}>{item.name}</span>
+                        <div style={{ flex: 1, background: '#2a2d3e', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: item.fill, borderRadius: 4, transition: 'width 0.6s ease' }} />
+                        </div>
+                        <span style={{ color: '#94a3b8', fontSize: 12, minWidth: 50, textAlign: 'right' }}>
+                          {item.value} ({pct}%)
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </div>
