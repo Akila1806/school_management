@@ -1,6 +1,8 @@
 const { generateSql, summarizeData } = require('../services/groqService')
 const { mcpQueryDatabase } = require('../services/mcpClient')
 const { sanitizeSql } = require('../utils/sanitizeSql')
+const { Messages } = require('../utils/messages')
+const { StatusCodes } = require('../utils/statusCodes')
 
 /**
  * Generic AI-driven student endpoint
@@ -39,7 +41,7 @@ INSERT INTO students (columns...) VALUES (values...) RETURNING *;
     console.log("rowsss",rows);
 
     if (!rows || rows.length === 0) {
-      return res.status(400).json({ error: "Insert failed" })
+      return res.status(StatusCodes.BAD_REQUEST).json({ error: Messages.Student.InsertFailed })
     }
 
     const student = rows[0]
@@ -67,7 +69,7 @@ INSERT INTO students (columns...) VALUES (values...) RETURNING *;
     })
 
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: err.message })
   }
 }
 
@@ -84,7 +86,7 @@ async function getStudents(req, res) {
     res.json({ students: rows })
   } catch (err) {
     console.error('Get students error:', err.message)
-    res.status(500).json({ detail: err.message })
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ detail: err.message })
   }
 }
 
@@ -93,13 +95,13 @@ async function getStudents(req, res) {
  */
 async function getStudentById(req, res) {
   const { id } = req.params
-  if (!id) return res.status(400).json({ detail: 'Student ID is required' })
+  if (!id) return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Student.IdRequired })
   try {
     const rows = await mcpQueryDatabase(`SELECT * FROM students WHERE student_id = ${parseInt(id, 10)} LIMIT 1;`)
-    if (!rows || rows.length === 0) return res.status(404).json({ detail: 'Student not found' })
+    if (!rows || rows.length === 0) return res.status(StatusCodes.NOT_FOUND).json({ detail: Messages.Student.NotFound(id) })
     res.json({ student: rows[0] })
   } catch (err) {
-    res.status(500).json({ detail: err.message })
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ detail: err.message })
   }
 }
 
@@ -111,11 +113,11 @@ async function updateStudent(req, res) {
   let studentData = req.body
 
   if (!id) {
-    return res.status(400).json({ detail: 'Student ID is required' })
+    return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Student.IdRequired })
   }
 
   if (!studentData || typeof studentData !== 'object') {
-    return res.status(400).json({ detail: 'Form data is required' })
+    return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Student.FormDataRequired })
   }
 
   try {
@@ -176,16 +178,16 @@ UPDATE students SET column=value,... WHERE student_id = ${id} RETURNING *;
       lower.includes("set ;") ||
       lower.includes("set where")
     ) {
-      return res.status(400).json({
-        error: "Invalid SQL generated"
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        error: Messages.Student.InvalidSql
       })
     }
 
     const rows = await mcpQueryDatabase(sql)
 
     if (!rows || rows.length === 0) {
-      return res.status(404).json({
-        detail: `Student with ID ${id} not found`
+      return res.status(StatusCodes.NOT_FOUND).json({
+        detail: Messages.Student.NotFound(id)
       })
     }
 
@@ -212,7 +214,7 @@ UPDATE students SET column=value,... WHERE student_id = ${id} RETURNING *;
 
     res.json({
       success: true,
-      message: "Student updated successfully",
+      message: Messages.Student.UpdateSuccess,
       data: {
         studentId: updatedRows[0].student_id,
         fullName: `${updatedRows[0].first_name} ${updatedRows[0].last_name}`,
@@ -224,7 +226,7 @@ UPDATE students SET column=value,... WHERE student_id = ${id} RETURNING *;
   } catch (err) {
     const detail = err.response?.data?.error?.message || err.message
     console.error("Update student error:", detail)
-    res.status(500).json({ detail })
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ detail })
   }
 }
 

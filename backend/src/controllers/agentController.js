@@ -1,6 +1,8 @@
 const { generateSql, summarizeData } = require('../services/groqService')
 const { mcpQueryDatabase } = require('../services/mcpClient')
 const { sanitizeSql } = require('../utils/sanitizeSql')
+const { Messages } = require('../utils/messages')
+const { StatusCodes } = require('../utils/statusCodes')
 const ExcelJS = require('exceljs')
 
 /**
@@ -57,7 +59,7 @@ async function agent(req, res) {
     prompt = formDataToPrompt(req.body)
   }
   
-  if (!prompt) return res.status(400).json({ detail: 'Message cannot be empty' })
+  if (!prompt) return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Agent.EmptyMessage })
 
   try {
     const rawSql = await generateSql(prompt)
@@ -67,39 +69,35 @@ async function agent(req, res) {
     const rows = await mcpQueryDatabase(sql)
     console.log("Query Result:", rows)
 
-    // For multi-row results, skip AI summarizer — render as table in frontend
     if (Array.isArray(rows) && rows.length > 1) {
       const isAllStudents = /all\s+students|list.*students|show.*students/i.test(prompt)
       const message = isAllStudents
-        ? `Here are all ${rows.length} students currently enrolled in the system.`
-        : `Here are the ${rows.length} results matching your query.`
-      return res.json({ analysis: message, data: rows, sql })
+        ? Messages.Agent.AllStudents(rows.length)
+        : Messages.Agent.QueryResults(rows.length)
+      return res.status(StatusCodes.OK).json({ analysis: message, data: rows, sql })
     }
 
     const analysis = await summarizeData(prompt, JSON.stringify(rows, null, 2))
     console.log("Data Analysis:", analysis)
-    res.json({ analysis, data: rows, sql })
+    res.status(StatusCodes.OK).json({ analysis, data: rows, sql })
   } catch (err) {
     const detail = err.response?.data?.error?.message || err.message
     console.error('Agent error:', detail)
-    res.status(500).json({ detail })
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ detail })
   }
 }
 
 async function exportExcel(req, res) {
   const prompt = (req.body.message || '').trim()
   console.log("Prompt",prompt);
-  if (!prompt) return res.status(400).json({ detail: 'Message cannot be empty' })
+  if (!prompt) return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Agent.EmptyMessage })
 
   try {
     const rawSql = await generateSql(prompt)
-    console.log("rawsql",rawSql);
     const sql = sanitizeSql(rawSql)
-    console.log("sql",sql);
     const rows = await mcpQueryDatabase(sql)
-    console.log("rows",rows);
 
-    if (!rows.length) return res.status(404).json({ detail: 'No data found to export' })
+    if (!rows.length) return res.status(StatusCodes.NOT_FOUND).json({ detail: Messages.Agent.NoDataToExport })
 
     const workbook = new ExcelJS.Workbook()
     const sheet = workbook.addWorksheet('Results')
@@ -145,7 +143,7 @@ async function exportExcel(req, res) {
     res.end()
   } catch (err) {
     console.error('Export error:', err.message)
-    res.status(500).json({ detail: err.message })
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ detail: err.message })
   }
 }
 

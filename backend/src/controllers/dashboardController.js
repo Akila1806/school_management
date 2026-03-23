@@ -1,6 +1,8 @@
 const { generateSql, summarizeData } = require('../services/groqService')
 const { mcpQueryDatabase } = require('../services/mcpClient')
 const { sanitizeSql } = require('../utils/sanitizeSql')
+const { Messages } = require('../utils/messages')
+const { StatusCodes } = require('../utils/statusCodes')
 
 // Cache for dashboard metrics to avoid rate limiting
 const dashboardCache = new Map()
@@ -27,31 +29,18 @@ async function getDashboardData(req, res) {
   const metric = (req.query.metric || '').trim()
   
   if (!metric) {
-    return res.status(400).json({ detail: 'Metric parameter is required' })
+    return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Dashboard.MetricRequired })
   }
 
   try {
-    // AI agent generates SQL based on schema and metric request
     const rawSql = await generateSql(metric)
     const sql = sanitizeSql(rawSql)
-    
-    console.log('Generated SQL:', sql)
-    
-    // Execute through MCP
     const rows = await mcpQueryDatabase(sql)
-    
-    console.log('Query result:', rows)
-    
-    // Return raw data for dashboard to process
-    res.json({ 
-      metric,
-      data: rows,
-      sql 
-    })
+    res.status(StatusCodes.OK).json({ metric, data: rows, sql })
   } catch (err) {
     const detail = err.response?.data?.error?.message || err.message
     console.error('Dashboard data error:', detail)
-    res.status(500).json({ detail })
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ detail })
   }
 }
 
@@ -63,7 +52,7 @@ async function getDashboardMetrics(req, res) {
   const metrics = req.body.metrics || []
   
   if (!Array.isArray(metrics) || metrics.length === 0) {
-    return res.status(400).json({ detail: 'Metrics array is required' })
+    return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Dashboard.MetricsArrayRequired })
   }
 
   try {
@@ -119,11 +108,10 @@ async function getDashboardMetrics(req, res) {
       }
     }
     
-    console.log('All results:', results)
-    res.json({ results })
+    res.status(StatusCodes.OK).json({ results })
   } catch (err) {
     console.error('Dashboard metrics error:', err.message)
-    res.status(500).json({ detail: err.message })
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ detail: err.message })
   }
 }
 
@@ -132,8 +120,7 @@ async function getDashboardMetrics(req, res) {
  */
 async function clearDashboardCache(req, res) {
   dashboardCache.clear()
-  console.log('Dashboard cache cleared')
-  res.json({ message: 'Dashboard cache cleared successfully' })
+  res.status(StatusCodes.OK).json({ message: Messages.Dashboard.CacheCleared })
 }
 
 module.exports = { getDashboardData, getDashboardMetrics, clearDashboardCache }
