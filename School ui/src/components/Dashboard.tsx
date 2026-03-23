@@ -116,7 +116,7 @@ export default function Dashboard() {
         }
 
         const attendanceRaw = results['get attendance summary by status']?.data || []
-        const attendanceSummary = attendanceRaw.map((r) => {
+        const attendanceSummary = attendanceRaw.map((r: { status?: string; count?: string }) => {
           const status = String(r.status ?? '').toLowerCase()
           return {
             name: status.charAt(0).toUpperCase() + status.slice(1),
@@ -126,7 +126,7 @@ export default function Dashboard() {
         })
 
         const weeklyRaw = results['get weekly attendance summary']?.data || []
-        const weekly = weeklyRaw.map((r) => {
+        const weekly = weeklyRaw.map((r: { status?: string; count?: string }) => {
           const status = String(r.status ?? '').toLowerCase()
           return {
             name: status.charAt(0).toUpperCase() + status.slice(1),
@@ -136,7 +136,7 @@ export default function Dashboard() {
         })
 
         const monthlyRaw = results['get last month attendance summary']?.data || []
-        const monthly = monthlyRaw.map((r) => {
+        const monthly = monthlyRaw.map((r: { status?: string; count?: string }) => {
           const status = String(r.status ?? '').toLowerCase()
           return {
             name: status.charAt(0).toUpperCase() + status.slice(1),
