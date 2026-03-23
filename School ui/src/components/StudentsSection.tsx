@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import styles from '../styles.module.css'
-
-const API = 'http://localhost:8000'
+import { postData } from '../utils/api'
+import { Messages } from '../utils/messages'
 
 const emptyForm = {
   firstName: '', lastName: '', grade: '', dob: '', age: '',
@@ -48,18 +48,18 @@ export default function StudentsSection({ prefill, onStudentCreated }: Props) {
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!form.firstName.trim()) e.firstName = 'First name is required'
-    if (!form.lastName.trim()) e.lastName = 'Last name is required'
-    if (!form.grade) e.grade = 'Grade is required'
-    if (!form.dob) e.dob = 'Date of birth is required'
-    if (!form.gender) e.gender = 'Gender is required'
-    if (!form.fatherName.trim()) e.fatherName = "Father's name is required"
-    if (!form.fatherOccupation.trim()) e.fatherOccupation = "Father's occupation is required"
-    if (!form.motherName.trim()) e.motherName = "Mother's name is required"
-    if (!form.address.trim()) e.address = 'Address is required'
-    if (!form.parentPhone.trim()) e.parentPhone = 'Parent phone number is required'
+    if (!form.firstName.trim()) e.firstName = Messages.Student.FirstNameRequired
+    if (!form.lastName.trim()) e.lastName = Messages.Student.LastNameRequired
+    if (!form.grade) e.grade = Messages.Student.GradeRequired
+    if (!form.dob) e.dob = Messages.Student.DobRequired
+    if (!form.gender) e.gender = Messages.Student.GenderRequired
+    if (!form.fatherName.trim()) e.fatherName = Messages.Student.FatherNameRequired
+    if (!form.fatherOccupation.trim()) e.fatherOccupation = Messages.Student.FatherOccupationRequired
+    if (!form.motherName.trim()) e.motherName = Messages.Student.MotherNameRequired
+    if (!form.address.trim()) e.address = Messages.Student.AddressRequired
+    if (!form.parentPhone.trim()) e.parentPhone = Messages.Student.ParentPhoneRequired
     else if (!/^[\+]?[1-9][\d]{0,15}$/.test(form.parentPhone.replace(/[\s\-\(\)]/g, '')))
-      e.parentPhone = 'Please enter a valid phone number'
+      e.parentPhone = Messages.Student.InvalidPhone
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -69,20 +69,15 @@ export default function StudentsSection({ prefill, onStudentCreated }: Props) {
     if (!validate()) return
     setIsSubmitting(true)
     try {
-      const res = await fetch(`${API}/api/students`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.detail || 'Save failed')
-      setSuccessMsg(`✅ ${form.firstName} ${form.lastName} saved successfully!`)
+      const json = await postData('/api/students', form)
+      if ((json as any)?.detail) throw new Error((json as any).detail)
+      setSuccessMsg(Messages.Student.SaveSuccess(`${form.firstName} ${form.lastName}`))
       onStudentCreated?.(form as Record<string, string>)
       setForm(emptyForm)
       setErrors({})
       setTimeout(() => setSuccessMsg(''), 4000)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error saving student'
+      const msg = err instanceof Error ? err.message : Messages.Student.SaveError
       setErrors(prev => ({ ...prev, _api: msg }))
     } finally {
       setIsSubmitting(false)
@@ -91,7 +86,7 @@ export default function StudentsSection({ prefill, onStudentCreated }: Props) {
 
   const handleReset = () => {
     if (Object.values(form).some(v => v.trim())) {
-      if (confirm('Clear all fields?')) { setForm(emptyForm); setErrors({}) }
+      if (confirm(Messages.Student.ClearConfirm)) { setForm(emptyForm); setErrors({}) }
     }
   }
 

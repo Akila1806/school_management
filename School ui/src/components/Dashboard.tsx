@@ -4,6 +4,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
 import styles from '../styles.module.css'
+import { postData } from '../utils/api'
+import { Messages } from '../utils/messages'
 
 interface DashboardMetrics {
   totalStudents: number
@@ -52,10 +54,7 @@ export default function Dashboard() {
         await new Promise(resolve => setTimeout(resolve, 200))
         
         // Make direct fetch call to dashboard metrics
-        const response = await fetch('http://localhost:8000/api/dashboard/metrics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const data = await postData('/api/dashboard/metrics', {
             metrics: [
               'count total number of students',
               'count male students',
@@ -65,22 +64,13 @@ export default function Dashboard() {
               'get weekly attendance summary',
               'get last month attendance summary',
             ]
-          })
-        })
+          }) as ApiResponse
 
-        if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error('Too many requests. Please wait a moment and try again.')
-          }
-          throw new Error(`HTTP error! status: ${response.status}`)
+        if (!data || !data.results) {
+          throw new Error(Messages.Dashboard.NoResults)
         }
 
-        const data: ApiResponse = await response.json()
         const results = data.results
-        
-        if (!results) {
-          throw new Error('No results received from API')
-        }
 
         // Check if any of the results have errors
         const criticalMetrics = ['count total number of students', 'count male students', 'count female students', 'get students grouped by grade level']
@@ -101,12 +91,11 @@ export default function Dashboard() {
         const gradeDataArray = results['get students grouped by grade level']?.data || []
         
         const gradeDistribution = gradeDataArray
-          .map((g) => ({
+          .map((g: { count?: string; grade_level?: string }) => ({
             name: g.grade_level || '',
             value: parseInt(g.count || '0', 10)
           }))
-          .sort((a, b) => {
-            // Extract grade number from "Grade X" format
+          .sort((a: { name: string; value: number }, b: { name: string; value: number }) => {
             const gradeA = parseInt(a.name.replace('Grade ', ''), 10)
             const gradeB = parseInt(b.name.replace('Grade ', ''), 10)
             return gradeA - gradeB
@@ -169,7 +158,7 @@ export default function Dashboard() {
         })
       } catch (err) {
         console.error('Dashboard API error:', err)
-        const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data'
+        const errorMessage = err instanceof Error ? err.message : Messages.Dashboard.LoadError
         setError(errorMessage)
         
         // Auto-retry with exponential backoff for rate limiting

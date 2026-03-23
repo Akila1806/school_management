@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { api } from '../services/api'
+import { postData } from '../utils/api'
+import { Messages } from '../utils/messages'
 import styles from '../styles.module.css'
 
 interface Props {
@@ -51,19 +52,16 @@ export default function StudentForm({ instanceId, onClose }: Props) {
     const newErrors: Record<string, string> = {}
 
     if (!form.fullName.trim()) {
-      newErrors.fullName = 'Full name is required'
+      newErrors.fullName = Messages.Student.FullNameRequired
     }
-
     if (!form.grade) {
-      newErrors.grade = 'Grade is required'
+      newErrors.grade = Messages.Student.GradeRequired
     }
-
     if (!form.dob) {
-      newErrors.dob = 'Date of birth is required'
+      newErrors.dob = Messages.Student.DobRequired
     }
-
     if (form.parentPhone && !/^[\+]?[1-9][\d]{0,15}$/.test(form.parentPhone.replace(/[\s\-\(\)]/g, ''))) {
-      newErrors.parentPhone = 'Please enter a valid phone number'
+      newErrors.parentPhone = Messages.Student.InvalidPhone
     }
 
     setErrors(newErrors)
@@ -80,11 +78,11 @@ export default function StudentForm({ instanceId, onClose }: Props) {
     setIsSubmitting(true)
     
     try {
-      const response = await api.post('/students', form)
-      alert(`Student "${form.fullName}" saved successfully!`)
+      await postData('/api/students', form)
+      alert(Messages.Student.SaveSuccess(form.fullName))
       onClose(instanceId)
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Error saving student. Please try again.'
+      const errorMsg = error instanceof Error ? error.message : Messages.Student.SaveError
       alert(errorMsg)
     } finally {
       setIsSubmitting(false)
@@ -93,7 +91,7 @@ export default function StudentForm({ instanceId, onClose }: Props) {
 
   const handleCancel = () => {
     if (Object.values(form).some(value => value.trim())) {
-      if (confirm('You have unsaved changes. Are you sure you want to close?')) {
+      if (confirm(Messages.Student.UnsavedConfirm)) {
         onClose(instanceId)
       }
     } else {

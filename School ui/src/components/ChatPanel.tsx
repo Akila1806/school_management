@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import styles from '../styles.module.css'
-
-const API = 'http://localhost:8000'
+import { postData, postBlob } from '../utils/api'
+import { Messages } from '../utils/messages'
 
 type Message = {
   id: number
@@ -279,28 +279,20 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
     setMessages(prev => [
       ...prev,
       { id: ++msgId, role: 'user', text },
-      { id: loadingId, role: 'assistant', text: 'Thinking...', loading: true },
+      { id: loadingId, role: 'assistant', text: Messages.Chat.Thinking, loading: true },
     ])
     try {
-      const res = await fetch(`${API}/api/agent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || 'Server error')
-      }
-      const json = await res.json()
+      const json = await postData('/api/agent', { message: text })
+      if ((json as any).detail) throw new Error((json as any).detail)
       setMessages(prev =>
         prev.map(m =>
           m.id === loadingId
-            ? { ...m, text: json.analysis, data: json.data, sql: json.sql, loading: false }
+            ? { ...m, text: (json as any).analysis, data: (json as any).data, sql: (json as any).sql, loading: false }
             : m
         )
       )
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Connection error'
+      const msg = e instanceof Error ? e.message : Messages.Chat.ConnectionError
       setMessages(prev =>
         prev.map(m =>
           m.id === loadingId
@@ -404,14 +396,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
     setExporting(msg.id)
     try {
       const prompt = msg.sql ? `Export this query: ${msg.sql}` : 'export'
-      const res = await fetch(`${API}/api/export`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt }),
-      })
-      if (res.ok) {
-        const blob = await res.blob()
-        const url = URL.createObjectURL(blob)
+      const exportBlob = await postBlob('/api/export', { message: prompt })
+      if (exportBlob) {
+        const url = URL.createObjectURL(exportBlob)
         const a = document.createElement('a')
         a.href = url; a.download = 'results.xlsx'; a.click()
         URL.revokeObjectURL(url)

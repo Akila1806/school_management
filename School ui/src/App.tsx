@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { fetchDataFromApi } from '@/utils/api'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import Dashboard from '@/components/Dashboard'
@@ -121,17 +122,14 @@ function AppContent() {
     try {
       const studentId = row.student_id
       if (studentId) {
-        const res = await fetch(`http://localhost:8000/api/students/${studentId}`)
-        const json = await res.json()
-        if (json.student) fullRow = json.student
+        const json = await fetchDataFromApi(`/api/students/${studentId}`)
+        if ((json as any).student) fullRow = (json as any).student
       } else {
-
         const q = row.email
           ? `get student with email ${row.email}`
           : `get student named ${row.first_name} ${row.last_name ?? ''}`
-        const res = await fetch(`http://localhost:8000/api/students?q=${encodeURIComponent(q)}`)
-        const json = await res.json()
-        if (json.students?.length > 0) fullRow = json.students[0]
+        const json = await fetchDataFromApi(`/api/students?q=${encodeURIComponent(q as string)}`)
+        if ((json as any).students?.length > 0) fullRow = (json as any).students[0]
       }
     } catch {
     }

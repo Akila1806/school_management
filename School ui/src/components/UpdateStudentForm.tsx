@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import styles from '../styles.module.css'
-
-const API = 'http://localhost:8000'
+import { editData } from '../utils/api'
+import { Messages } from '../utils/messages'
 
 type FormData = {
   studentId: string
@@ -58,18 +58,18 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
 
   const validate = () => {
     const e: Record<string, string> = {}
-    if (!form.firstName.trim()) e.firstName = 'First name is required'
-    if (!form.lastName.trim()) e.lastName = 'Last name is required'
-    if (!form.grade) e.grade = 'Grade is required'
-    if (!form.dob) e.dob = 'Date of birth is required'
-    if (!form.gender) e.gender = 'Gender is required'
-    if (!form.fatherName.trim()) e.fatherName = "Father's name is required"
-    if (!form.fatherOccupation.trim()) e.fatherOccupation = "Father's occupation is required"
-    if (!form.motherName.trim()) e.motherName = "Mother's name is required"
-    if (!form.address.trim()) e.address = 'Address is required'
-    if (!form.parentPhone.trim()) e.parentPhone = 'Parent phone number is required'
+    if (!form.firstName.trim()) e.firstName = Messages.Student.FirstNameRequired
+    if (!form.lastName.trim()) e.lastName = Messages.Student.LastNameRequired
+    if (!form.grade) e.grade = Messages.Student.GradeRequired
+    if (!form.dob) e.dob = Messages.Student.DobRequired
+    if (!form.gender) e.gender = Messages.Student.GenderRequired
+    if (!form.fatherName.trim()) e.fatherName = Messages.Student.FatherNameRequired
+    if (!form.fatherOccupation.trim()) e.fatherOccupation = Messages.Student.FatherOccupationRequired
+    if (!form.motherName.trim()) e.motherName = Messages.Student.MotherNameRequired
+    if (!form.address.trim()) e.address = Messages.Student.AddressRequired
+    if (!form.parentPhone.trim()) e.parentPhone = Messages.Student.ParentPhoneRequired
     else if (!/^[\+]?[1-9][\d]{0,15}$/.test(form.parentPhone.replace(/[\s\-\(\)]/g, '')))
-      e.parentPhone = 'Please enter a valid phone number'
+      e.parentPhone = Messages.Student.InvalidPhone
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -77,24 +77,19 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (isUpdated) {
-      setErrors(prev => ({ ...prev, _api: `${form.firstName} ${form.lastName} already updated. Load a new student to make changes.` }))
+      setErrors(prev => ({ ...prev, _api: Messages.Student.AlreadyUpdated(`${form.firstName} ${form.lastName}`) }))
       return
     }
     if (!validate()) return
     setIsSubmitting(true)
     try {
-      const res = await fetch(`${API}/api/students/${form.studentId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.detail || 'Update failed')
-      setSuccessMsg(`✅ ${form.firstName} ${form.lastName} updated successfully!`)
+      const json = await editData(`/api/students/${form.studentId}`, form)
+      if ((json as any)?.detail) throw new Error((json as any).detail)
+      setSuccessMsg(Messages.Student.UpdateSuccess(`${form.firstName} ${form.lastName}`))
       setIsUpdated(true)
       onStudentUpdated?.(form as Record<string, string>)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error updating student'
+      const msg = err instanceof Error ? err.message : Messages.Student.UpdateError
       setErrors(prev => ({ ...prev, _api: msg }))
     } finally {
       setIsSubmitting(false)
@@ -216,7 +211,7 @@ export default function UpdateStudentForm({ prefill, onStudentUpdated }: Props) 
                 Reset
               </button>
               <button type="submit" className={styles.saveButton} disabled={isSubmitting || isUpdated}>
-                {isSubmitting ? 'Updating...' : isUpdated ? '✅ Updated Students' : '✏️ Update Student'}
+                {isSubmitting ? Messages.Student.Updating : isUpdated ? Messages.Student.AlreadyUpdatedBtn : '✏️ Update Student'}
               </button>
             </div>
 
