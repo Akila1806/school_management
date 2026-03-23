@@ -36,6 +36,7 @@ INSERT INTO students (columns...) VALUES (values...) RETURNING *;
     const sql = sanitizeSql(rawSql)
 
     const rows = await mcpQueryDatabase(sql)
+    console.log("rowsss",rows);
 
     if (!rows || rows.length === 0) {
       return res.status(400).json({ error: "Insert failed" })
@@ -83,6 +84,21 @@ async function getStudents(req, res) {
     res.json({ students: rows })
   } catch (err) {
     console.error('Get students error:', err.message)
+    res.status(500).json({ detail: err.message })
+  }
+}
+
+/**
+ * GET /api/students/:id - fetch a single student by ID
+ */
+async function getStudentById(req, res) {
+  const { id } = req.params
+  if (!id) return res.status(400).json({ detail: 'Student ID is required' })
+  try {
+    const rows = await mcpQueryDatabase(`SELECT * FROM students WHERE student_id = ${parseInt(id, 10)} LIMIT 1;`)
+    if (!rows || rows.length === 0) return res.status(404).json({ detail: 'Student not found' })
+    res.json({ student: rows[0] })
+  } catch (err) {
     res.status(500).json({ detail: err.message })
   }
 }
@@ -212,4 +228,4 @@ UPDATE students SET column=value,... WHERE student_id = ${id} RETURNING *;
   }
 }
 
-module.exports = { handleStudentRequest, getStudents, updateStudent }
+module.exports = { handleStudentRequest, getStudents, getStudentById, updateStudent }

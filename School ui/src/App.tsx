@@ -86,13 +86,13 @@ function AppContent() {
     const hasAutoOpened = sessionStorage.getItem('dashboardAutoOpened')
     const hasSavedTabs = sessionStorage.getItem('openTabs')
     const savedTabs = hasSavedTabs ? JSON.parse(hasSavedTabs) : []
-    
+
     if (!hasAutoOpened && savedTabs.length === 0) {
       const timer = setTimeout(() => {
         handleShowDashboard()
         sessionStorage.setItem('dashboardAutoOpened', 'true')
       }, 500)
-      
+
       return () => clearTimeout(timer)
     }
   }, [])
@@ -116,8 +116,28 @@ function AppContent() {
     chatRef.current?.addStudentCreatedMessage(form)
   }
 
-  const handleUpdateStudent = (row: Record<string, unknown>) => {    const tabId = `student-${++studentTabCounter}`
-    const name = `${row.first_name ?? ''} ${row.last_name ?? ''}`.trim()
+  const handleUpdateStudent = async (row: Record<string, unknown>) => {
+    let fullRow = row
+    try {
+      const studentId = row.student_id
+      if (studentId) {
+        const res = await fetch(`http://localhost:8000/api/students/${studentId}`)
+        const json = await res.json()
+        if (json.student) fullRow = json.student
+      } else {
+
+        const q = row.email
+          ? `get student with email ${row.email}`
+          : `get student named ${row.first_name} ${row.last_name ?? ''}`
+        const res = await fetch(`http://localhost:8000/api/students?q=${encodeURIComponent(q)}`)
+        const json = await res.json()
+        if (json.students?.length > 0) fullRow = json.students[0]
+      }
+    } catch {
+    }
+
+    const tabId = `student-${++studentTabCounter}`
+    const name = `${fullRow.first_name ?? ''} ${fullRow.last_name ?? ''}`.trim()
     const newTab: Tab = {
       id: tabId,
       title: name || 'Update Student',
@@ -125,7 +145,7 @@ function AppContent() {
       closable: true,
       modified: false,
     }
-    setPrefillMap(prev => ({ ...prev, [tabId]: rowToForm(row) }))
+    setPrefillMap(prev => ({ ...prev, [tabId]: rowToForm(fullRow) }))
     setTabs(prev => [...prev, newTab])
     setActiveTab(tabId)
   }
@@ -137,7 +157,7 @@ function AppContent() {
   const handleShowDashboard = () => {
     // Check if dashboard tab already exists
     const existingDashboard = tabs.find(tab => tab.id === 'dashboard')
-    
+
     if (existingDashboard) {
       // If dashboard exists, just switch to it
       setActiveTab('dashboard')
@@ -189,7 +209,7 @@ function AppContent() {
             <p className={styles.greetingSubtitle}>
               Your comprehensive solution for managing student information and school operations
             </p>
-       
+
             <div className={styles.greetingHint}>
               <p>You can also use the AI assistant in the chat panel to get started →</p>
             </div>
@@ -205,13 +225,13 @@ function AppContent() {
           <h1 className={styles.greetingTitle}>Welcome Back!</h1>
           <p className={styles.greetingSubtitle}>Select an option to continue</p>
           <div className={styles.greetingActions}>
-            <button 
+            <button
               className={styles.greetingButton}
               onClick={handleShowDashboard}
             >
               📊 Open Dashboard
             </button>
-            <button 
+            <button
               className={styles.greetingButton}
               onClick={() => handleBadgeClick('Create Student')}
             >

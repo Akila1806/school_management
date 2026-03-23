@@ -4,7 +4,7 @@ const { sanitizeSql } = require('../utils/sanitizeSql')
 
 // Cache for dashboard metrics to avoid rate limiting
 const dashboardCache = new Map()
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const CACHE_DURATION = 1 * 60 * 1000 // 1 minute
 
 // Pre-defined SQL queries for common dashboard metrics to avoid Groq API calls
 const PREDEFINED_QUERIES = {
@@ -14,7 +14,7 @@ const PREDEFINED_QUERIES = {
   'get students grouped by grade level': 'SELECT grade_level, COUNT(*) as count FROM students GROUP BY grade_level ORDER BY grade_level',
   'get attendance summary by status': "SELECT status, COUNT(*) as count FROM attendance GROUP BY status ORDER BY status",
   'get attendance by grade': "SELECT s.grade_level, a.status, COUNT(*) as count FROM attendance a JOIN students s ON a.student_id = s.student_id GROUP BY s.grade_level, a.status ORDER BY s.grade_level",
-  'get weekly attendance summary': "SELECT status, COUNT(*) as count FROM attendance WHERE attendance_date >= date_trunc('week', CURRENT_DATE) AND attendance_date < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days' GROUP BY status ORDER BY status",
+  'get weekly attendance summary': "SELECT status, COUNT(*) as count FROM attendance WHERE attendance_date >= date_trunc('week', CURRENT_DATE AT TIME ZONE 'Asia/Kolkata') AND attendance_date <= (date_trunc('week', CURRENT_DATE AT TIME ZONE 'Asia/Kolkata') + INTERVAL '6 days') GROUP BY status ORDER BY status",
   'get last month attendance summary': "SELECT status, COUNT(*) as count FROM attendance WHERE attendance_date >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month') AND attendance_date < date_trunc('month', CURRENT_DATE) GROUP BY status ORDER BY status"
 }
 
