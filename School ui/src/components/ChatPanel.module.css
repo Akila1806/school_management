@@ -317,3 +317,12 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+.inlineAttendance {
+  width: 100%;
+  min-height: 400px;
+  max-height: 70vh;
+  overflow-y: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border-color, #2a2d3e);
+  background: var(--main-bg, #0f1117);
+}

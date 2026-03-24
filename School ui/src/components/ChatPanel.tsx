@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import styles from '../styles.module.css'
+import chatStyles from './ChatPanel.module.css'
 import { postData, postBlob } from '../utils/api'
 import { Messages } from '../utils/messages'
 
@@ -16,6 +17,7 @@ type Message = {
 interface Props {
   onBadgeClick: (badge: string) => boolean
   onShowDashboard: () => void
+  onShowAttendance: () => void
   onUpdateStudent: (row: Record<string, unknown>) => void
 }
 
@@ -27,8 +29,9 @@ export interface ChatPanelHandle {
 let msgId = 0
 
 const SLASH_COMMANDS = [
-  { label: '👤 Create Student', key: 'create student', display: 'Create Student' },
-  { label: '📊 Show Dashboard', key: 'show dashboard', display: 'Show Dashboard' },
+  { label: '👤 Create Student',  key: 'create student', display: 'Create Student' },
+  { label: '📊 Show Dashboard',  key: 'show dashboard', display: 'Show Dashboard' },
+  { label: '📋 Attendance Sheet', key: 'attendance',    display: 'Attendance' },
 ]
 
 // ── SVG Icons ──────────────────────────────────────────────
@@ -161,7 +164,6 @@ function renderTable(data: Record<string, unknown>[]) {
   const formatVal = (v: unknown) => {
     if (v === null || v === undefined || v === '') return '—'
     const s = String(v)
-    // Format ISO date
     if (/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(s)) {
       const d = new Date(s)
       return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
@@ -200,7 +202,6 @@ function renderTable(data: Record<string, unknown>[]) {
   )
 }
 
-
 function buildFields(form: Record<string, string>) {
   return [
     form.firstName && form.lastName ? `Name: ${form.firstName} ${form.lastName}` : null,
@@ -218,7 +219,7 @@ function buildFields(form: Record<string, string>) {
 }
 
 const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
-  { onBadgeClick, onShowDashboard, onUpdateStudent },
+  { onBadgeClick, onShowDashboard, onShowAttendance, onUpdateStudent },
   ref
 ) {
   const [messages, setMessages] = useState<Message[]>([
@@ -271,6 +272,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
       ])
       return true
     }
+    if (key === 'attendance') {
+      onShowAttendance()
+      setMessages(prev => [
+        ...prev,
+        { id: ++msgId, role: 'user', text: display },
+        { id: ++msgId, role: 'assistant', text: 'Opening the Attendance Sheet.' },
+      ])
+      return true
+    }
     return false
   }
 
@@ -284,10 +294,19 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
     try {
       const json = await postData('/api/agent', { message: text })
       if ((json as any).detail) throw new Error((json as any).detail)
+      const j = json as any
       setMessages(prev =>
         prev.map(m =>
           m.id === loadingId
-            ? { ...m, text: (json as any).analysis, data: (json as any).data, sql: (json as any).sql, loading: false }
+            ? {
+                ...m,
+                text: j.analysis,
+                data: j.data,
+                sql: j.sql,
+                loading: false,
+                disambiguate: j.disambiguate ?? false,
+                originalPrompt: j.originalPrompt,
+              }
             : m
         )
       )
@@ -304,25 +323,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
   }
 
   const CREATE_STUDENT_PATTERNS = [
-    // create / crate / craete / creat
     /cr[ea]{1,3}te?\s+a?\s*stu[a-z]*/i,
-    // add student
     /add\s+a?\s*stu[a-z]*/i,
-    // new student
     /new\s+stu[a-z]*/i,
-    // open / opn / ope + form / student form
     /op[a-z]*\s+.*?(stu[a-z]*\s+)?form/i,
-    // fill form / fill student form
     /fil+\s+.*?form/i,
-    // student form (any order)
     /stu[a-z]*\s+form/i,
-    // register student
     /reg[a-z]*\s+.*?stu[a-z]*/i,
-    // enroll student
     /enro[a-z]*\s+.*?stu[a-z]*/i,
-    // student registration
     /stu[a-z]*\s+reg[a-z]*/i,
-    // insert student
     /insert\s+.*?stu[a-z]*/i,
   ]
 
@@ -332,7 +341,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
     setInput('')
     setShowSlashMenu(false)
 
-    if (execLocalCommand(trimmed.toLowerCase(), trimmed)) return
+    if (execLocalCommand(trimmed.replace(/^\//, '').toLowerCase(), trimmed)) return
 
     // Detect create-student intent
     if (CREATE_STUDENT_PATTERNS.some(p => p.test(trimmed))) {
@@ -345,13 +354,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
       return
     }
 
-    // Detect attendance intent
-    if (/attend[a-z]*/i.test(trimmed)) {
-      onShowDashboard()
+    // Detect attendance intent — open in new tab
+    if (/\battend[a-z]*/i.test(trimmed)) {
+      onShowAttendance()
       setMessages(prev => [
         ...prev,
         { id: ++msgId, role: 'user', text: trimmed },
-        { id: ++msgId, role: 'assistant', text: 'Opened the dashboard — scroll down to see the Attendance Overview chart.' },
+        { id: ++msgId, role: 'assistant', text: 'Opening the Attendance Sheet.' },
       ])
       return
     }
@@ -362,8 +371,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value
     setInput(val)
-    // show slash menu when input starts with "\"
-    setShowSlashMenu(val.startsWith('\\'))
+    setShowSlashMenu(val.startsWith('/'))
   }
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -483,7 +491,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
         <div ref={bottomRef} />
       </div>
 
-      {/* Slash command popup — shown above input when user types \ */}
+      {/* Slash command popup */}
       {showSlashMenu && (
         <div className={styles.slashMenu}>
           {SLASH_COMMANDS.filter(({ display }) =>
@@ -507,7 +515,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKey}
-          placeholder="Ask anything... (type \ for commands)"
+          placeholder="Ask anything... (type / for commands)"
           rows={1}
         />
         <button className={styles.sendBtn} onClick={send} disabled={!input.trim()} aria-label="Send message">

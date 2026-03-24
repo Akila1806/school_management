@@ -5,6 +5,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import Dashboard from '@/components/Dashboard'
 import StudentsSection from '@/components/StudentsSection'
 import UpdateStudentForm from '@/components/UpdateStudentForm'
+import AttendanceSheet from '@/components/AttendanceSheet'
 import ChatPanel, { ChatPanelHandle } from '@/components/ChatPanel'
 import TabBar, { Tab } from '@/components/TabBar'
 import SplitLayout from '@/components/SplitLayout'
@@ -152,6 +153,13 @@ function AppContent() {
     chatRef.current?.addStudentUpdatedMessage(form)
   }
 
+  const handleShowAttendance = () => {
+    const existing = tabs.find(tab => tab.id === 'attendance')
+    if (existing) { setActiveTab('attendance'); return }
+    setTabs(prev => [...prev, { id: 'attendance', title: 'Attendance', icon: '📋', closable: true, modified: false }])
+    setActiveTab('attendance')
+  }
+
   const handleShowDashboard = () => {
     // Check if dashboard tab already exists
     const existingDashboard = tabs.find(tab => tab.id === 'dashboard')
@@ -190,7 +198,9 @@ function AppContent() {
 
   const renderMainContent = () => {
     if (activeTab === 'dashboard') {
-      return <Dashboard />
+      return <Dashboard onNavigateToAttendance={handleShowAttendance} />
+    } else if (activeTab === 'attendance') {
+      return <AttendanceSheet />
     } else if (activeTab.startsWith('student-')) {
       const prefill = prefillMap[activeTab]
       if (prefill?.studentId) {
@@ -223,17 +233,14 @@ function AppContent() {
           <h1 className={styles.greetingTitle}>Welcome Back!</h1>
           <p className={styles.greetingSubtitle}>Select an option to continue</p>
           <div className={styles.greetingActions}>
-            <button
-              className={styles.greetingButton}
-              onClick={handleShowDashboard}
-            >
+            <button className={styles.greetingButton} onClick={handleShowDashboard}>
               📊 Open Dashboard
             </button>
-            <button
-              className={styles.greetingButton}
-              onClick={() => handleBadgeClick('Create Student')}
-            >
+            <button className={styles.greetingButton} onClick={() => handleBadgeClick('Create Student')}>
               👤 Create Student
+            </button>
+            <button className={styles.greetingButton} onClick={handleShowAttendance}>
+              📋 Attendance
             </button>
           </div>
         </div>
@@ -249,6 +256,11 @@ function AppContent() {
           activeTab={activeTab}
           onTabSelect={handleTabSelect}
           onTabClose={handleTabClose}
+          onNewTab={(type) => {
+            if (type === 'dashboard') handleShowDashboard()
+            else if (type === 'attendance') handleShowAttendance()
+            else handleBadgeClick('Create Student')
+          }}
         />
       )}
       <div className={styles.tabContent}>
@@ -258,7 +270,7 @@ function AppContent() {
   )
 
   const rightPanel = (
-    <ChatPanel ref={chatRef} onBadgeClick={handleBadgeClick} onShowDashboard={handleShowDashboard} onUpdateStudent={handleUpdateStudent} />
+    <ChatPanel ref={chatRef} onBadgeClick={handleBadgeClick} onShowDashboard={handleShowDashboard} onShowAttendance={handleShowAttendance} onUpdateStudent={handleUpdateStudent} />
   )
 
   return (

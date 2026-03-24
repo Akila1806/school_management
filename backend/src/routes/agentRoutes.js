@@ -2,6 +2,7 @@ const { Router } = require('express')
 const { agent, exportExcel } = require('../controllers/agentController')
 const { handleStudentRequest, getStudents, getStudentById, updateStudent } = require('../controllers/studentController')
 const { getDashboardData, getDashboardMetrics, clearDashboardCache } = require('../controllers/dashboardController')
+const { getSubjects, getGrades, getStudentsByGrade, markAttendance, getAttendance } = require('../controllers/attendanceController')
 
 const router = Router()
 
@@ -14,5 +15,10 @@ router.put('/students/:id', updateStudent)
 router.get('/dashboard', getDashboardData)
 router.post('/dashboard/metrics', getDashboardMetrics)
 router.delete('/dashboard/cache', clearDashboardCache)
+router.get('/subjects', getSubjects)
+router.get('/attendance/grades', getGrades)
+router.get('/attendance/students', getStudentsByGrade)
+router.post('/attendance', markAttendance)
+router.get('/attendance', getAttendance)
 
 module.exports = router

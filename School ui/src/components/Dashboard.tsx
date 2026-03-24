@@ -26,7 +26,7 @@ interface ApiResponse {
   results: Record<string, ApiResult>
 }
 
-export default function Dashboard() {
+export default function Dashboard({ onNavigateToAttendance }: { onNavigateToAttendance?: () => void }) {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalStudents: 0,
     maleCount: 0,
@@ -275,9 +275,6 @@ export default function Dashboard() {
             </div>
             <div className={styles.profileDropdownDivider} />
             <button className={styles.profileDropdownItem}>👤 My Profile</button>
-            <button className={styles.profileDropdownItem}>📅 My Schedule</button>
-            <button className={styles.profileDropdownItem}>🔔 Notifications</button>
-            <button className={styles.profileDropdownItem}>⚙️ Settings</button>
             <div className={styles.profileDropdownDivider} />
             <button className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}>
               🚪 Sign Out
@@ -328,7 +325,10 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        <div className={styles.chartCard} style={{ gridColumn: '1 / -1' }}>
+        <div
+          className={styles.chartCard}
+          style={{ gridColumn: '1 / -1' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
             <h3 className={styles.chartTitle} style={{ margin: 0 }}>Attendance Overview</h3>
             <div style={{ display: 'flex', gap: '6px' }}>
