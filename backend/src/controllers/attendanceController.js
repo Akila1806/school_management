@@ -2,7 +2,7 @@ const { generateSql } = require('../services/groqService')
 const { mcpQueryDatabase, mcpGetSchema } = require('../services/mcpClient')
 const { sanitizeSql } = require('../utils/sanitizeSql')
 const { StatusCodes } = require('../utils/statusCodes')
-const { mcpAgent } = require('../services/mcpAgent')
+const { mcpAgent } = require('../services/mcpClient')
 
 async function getSubjects(req, res) {
   try {

@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const { getCitiesByState } = require('../services/groqService')
-const { mcpAgent } = require('../services/mcpAgent')
+const { mcpAgent } = require('../services/mcpClient')
 const { StatusCodes } = require('../utils/statusCodes')
 const { Messages } = require('../utils/messages')
 
