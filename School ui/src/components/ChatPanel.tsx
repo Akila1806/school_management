@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react'
 import styles from '../styles.module.css'
-import chatStyles from './ChatPanel.module.css'
 import { postData, postBlob } from '../utils/api'
 import { Messages } from '../utils/messages'
 
@@ -272,7 +271,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
       ])
       return true
     }
-    if (key === 'attendance') {
+    if (key === 'attendance' || /attend/i.test(key)) {
       onShowAttendance()
       setMessages(prev => [
         ...prev,
@@ -322,6 +321,25 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
     }
   }
 
+  // fuzzy match — checks if any word in input is close to target
+  const fuzzyMatch = (input: string, target: string, maxDist = 3): boolean => {
+    const words = input.toLowerCase().split(/\s+/)
+    const t = target.toLowerCase()
+    for (const word of words) {
+      if (word.length < 3) continue
+      // simple edit distance
+      const a = word, b = t
+      const dp: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
+        Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+      )
+      for (let i = 1; i <= a.length; i++)
+        for (let j = 1; j <= b.length; j++)
+          dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+      if (dp[a.length][b.length] <= maxDist) return true
+    }
+    return false
+  }
+
   const CREATE_STUDENT_PATTERNS = [
     /cr[ea]{1,3}te?\s+a?\s*stu[a-z]*/i,
     /add\s+a?\s*stu[a-z]*/i,
@@ -354,8 +372,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
       return
     }
 
-    // Detect attendance intent — open in new tab
-    if (/\battend[a-z]*/i.test(trimmed)) {
+    // Detect attendance intent — regex + fuzzy match for misspellings
+    if (
+      /at{1,2}[ea]n?[dt][ea]?n?[cd]e?|attend|attnd|atend|attndc|mark.*present|mark.*absent|daily.*record|class.*record/i.test(trimmed) ||
+      fuzzyMatch(trimmed, 'attendance', 3)
+    ) {
       onShowAttendance()
       setMessages(prev => [
         ...prev,

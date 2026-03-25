@@ -24,8 +24,8 @@ interface AttendanceRow {
 
 const STATUS_CONFIG: { key: Status; label: string; short: string }[] = [
   { key: 'Present', label: 'Present', short: 'P' },
-  { key: 'Absent',  label: 'Absent',  short: 'A' },
-  { key: 'Late',    label: 'Late',    short: 'L' },
+  { key: 'Absent', label: 'Absent', short: 'A' },
+  { key: 'Late', label: 'Late', short: 'L' },
   { key: 'Excused', label: 'Excused', short: 'E' },
 ]
 
@@ -36,18 +36,18 @@ function todayStr() {
 }
 
 export default function AttendanceSheet() {
-  const [date, setDate]           = useState(todayStr())
+  const [date, setDate] = useState(todayStr())
   const [gradeFilter, setGradeFilter] = useState('')
   const [subjectId, setSubjectId] = useState('')
-  const [subjects, setSubjects]   = useState<Subject[]>([])
-  const [grades, setGrades]       = useState<string[]>([])
-  const [students, setStudents]   = useState<Student[]>([])
-  const [rows, setRows]           = useState<Record<number, AttendanceRow>>({})
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [grades, setGrades] = useState<string[]>([])
+  const [students, setStudents] = useState<Student[]>([])
+  const [rows, setRows] = useState<Record<number, AttendanceRow>>({})
   const [loadingStudents, setLoadingStudents] = useState(false)
-  const [saving, setSaving]       = useState(false)
+  const [saving, setSaving] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
-  const [page, setPage]           = useState(1)
-  const [isDirty, setIsDirty]     = useState(false)
+  const [page, setPage] = useState(1)
+  const [isDirty, setIsDirty] = useState(false)
   const [pendingGrade, setPendingGrade] = useState<string | null>(null)
 
 
@@ -127,12 +127,11 @@ export default function AttendanceSheet() {
     setSuccessMsg('')
     try {
       const payload = students.map(s => ({
-        student_id:      s.student_id,
-        student_name:    `${s.first_name} ${s.last_name}`.trim(),
-        subject_id:      Number(subjectId),
+        student_id: s.student_id,
+        subject_id: Number(subjectId),
         attendance_date: date,
-        status:          rows[s.student_id]?.status ?? 'Present',
-        remarks:         rows[s.student_id]?.remarks ?? '',
+        status: rows[s.student_id]?.status ?? 'Present',
+        remarks: rows[s.student_id]?.remarks ?? '',
       }))
       await postData('/api/attendance', { records: payload })
       setSuccessMsg('Attendance saved!')
@@ -351,10 +350,10 @@ export default function AttendanceSheet() {
               {!subjectId && !gradeFilter
                 ? '⚠ Select a subject and grade to enable saving'
                 : !subjectId
-                ? '⚠ Select a subject to enable saving'
-                : students.length === 0
-                ? '⚠ Select a grade to load students'
-                : ''}
+                  ? '⚠ Select a subject to enable saving'
+                  : students.length === 0
+                    ? '⚠ Select a grade to load students'
+                    : ''}
             </span>
           )}
           <button

@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { fetchDataFromApi } from '@/utils/api'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
+import Login from '@/pages/Login'
+import Signup from '@/pages/Signup'
 import Dashboard from '@/components/Dashboard'
 import StudentsSection from '@/components/StudentsSection'
 import UpdateStudentForm from '@/components/UpdateStudentForm'
@@ -52,15 +55,36 @@ export default function App() {
 }
 
 function AppContent() {
+  const { isAuthenticated } = useAuth()
+  const [authView, setAuthView] = useState<'login' | 'signup'>('login')
+
+  if (!isAuthenticated) {
+    return authView === 'login'
+      ? <Login onSwitchToSignup={() => setAuthView('signup')} />
+      : <Signup onSwitchToLogin={() => setAuthView('login')} />
+  }
+
+  return <MainApp />
+}
+
+function MainApp() {
   const { theme, toggleTheme } = useTheme()
+  const { user, logout } = useAuth()
+
+  const DASHBOARD_TAB: Tab = { id: 'dashboard', title: 'Dashboard', icon: '📊', closable: true, modified: false }
+
   const [tabs, setTabs] = useState<Tab[]>(() => {
     try {
       const saved = sessionStorage.getItem('openTabs')
-      return saved ? JSON.parse(saved) : []
-    } catch { return [] }
+      const parsed: Tab[] = saved ? JSON.parse(saved) : []
+      // always ensure dashboard tab exists
+      if (!parsed.find(t => t.id === 'dashboard')) return [DASHBOARD_TAB, ...parsed]
+      return parsed
+    } catch { return [DASHBOARD_TAB] }
   })
   const [activeTab, setActiveTab] = useState<string>(() => {
-    return sessionStorage.getItem('activeTab') || ''
+    const saved = sessionStorage.getItem('activeTab')
+    return saved || 'dashboard'
   })
   const [prefillMap, setPrefillMap] = useState<Record<string, ReturnType<typeof rowToForm>>>(() => {
     try {
@@ -83,20 +107,10 @@ function AppContent() {
     sessionStorage.setItem('prefillMap', JSON.stringify(prefillMap))
   }, [prefillMap])
 
-  // Auto-open dashboard on first load only (not on every refresh)
+  // Always open dashboard on login
   useEffect(() => {
-    const hasAutoOpened = sessionStorage.getItem('dashboardAutoOpened')
-    const hasSavedTabs = sessionStorage.getItem('openTabs')
-    const savedTabs = hasSavedTabs ? JSON.parse(hasSavedTabs) : []
-
-    if (!hasAutoOpened && savedTabs.length === 0) {
-      const timer = setTimeout(() => {
-        handleShowDashboard()
-        sessionStorage.setItem('dashboardAutoOpened', 'true')
-      }, 500)
-
-      return () => clearTimeout(timer)
-    }
+    setTabs(prev => prev.find(t => t.id === 'dashboard') ? prev : [{ id: 'dashboard', title: 'Dashboard', icon: '📊', closable: true, modified: false }, ...prev])
+    setActiveTab('dashboard')
   }, [])
 
   const handleBadgeClick = (badge: string): boolean => {
@@ -198,7 +212,7 @@ function AppContent() {
 
   const renderMainContent = () => {
     if (activeTab === 'dashboard') {
-      return <Dashboard onNavigateToAttendance={handleShowAttendance} />
+      return <Dashboard onNavigateToAttendance={handleShowAttendance} user={user} onLogout={logout} />
     } else if (activeTab === 'attendance') {
       return <AttendanceSheet />
     } else if (activeTab.startsWith('student-')) {

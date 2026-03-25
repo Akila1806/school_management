@@ -150,4 +150,42 @@ FORMATTING RULES:
   )
 }
 
-module.exports = { generateSql, summarizeData }
+async function getCitiesByState(state) {
+  const systemPrompt = `You are a geography assistant. Return ONLY a valid JSON array of major cities for the given Indian state.
+No markdown, no explanation, no code block — just a raw JSON array of strings.
+Example output: ["Chennai","Coimbatore","Madurai","Salem","Tiruchirappalli"]
+Include 10-20 well-known cities/towns. Sort alphabetically.`
+
+  const raw = await callGroq(systemPrompt, `List major cities in ${state}, India.`)
+  // Strip any accidental markdown fences
+  const cleaned = raw.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim()
+  return JSON.parse(cleaned)
+}
+
+async function generateAuthSql(prompt) {
+  const systemPrompt = `You are a PostgreSQL SQL generator for a users authentication table.
+
+TABLE SCHEMA:
+users (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(150) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'teacher',
+  grade VARCHAR(50),
+  phone VARCHAR(20),
+  address TEXT,
+  city VARCHAR(100),
+  state VARCHAR(100),
+  created_at TIMESTAMP DEFAULT NOW()
+)
+
+RULES:
+- Return ONLY raw SQL, no markdown, no explanation, no code blocks
+- Never hardcode actual values — embed them exactly as given in the prompt
+- Output ONLY the SQL string`
+
+  return callGroq(systemPrompt, prompt)
+}
+
+module.exports = { generateSql, summarizeData, getCitiesByState, generateAuthSql }

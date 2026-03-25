@@ -26,7 +26,20 @@ interface ApiResponse {
   results: Record<string, ApiResult>
 }
 
-export default function Dashboard({ onNavigateToAttendance }: { onNavigateToAttendance?: () => void }) {
+interface User {
+  id: number
+  name: string
+  email: string
+  role: string
+  grade?: string
+}
+
+export default function Dashboard({ onNavigateToAttendance, user, onLogout, onShowProfile }: {
+  onNavigateToAttendance?: () => void
+  user?: User | null
+  onLogout?: () => void
+  onShowProfile?: () => void
+}) {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalStudents: 0,
     maleCount: 0,
@@ -239,18 +252,12 @@ export default function Dashboard({ onNavigateToAttendance }: { onNavigateToAtte
 
         <div className={styles.profileWrapper}>
         <button className={styles.profileBtn} onClick={() => setProfileOpen(o => !o)}>
-          <div className={styles.profileAvatar}>
-            <img
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=SarahJohnson&backgroundColor=6366f1&clothingColor=6366f1"
-              alt="Ms. Sarah Johnson"
-              width="32"
-              height="32"
-              style={{ borderRadius: '50%', display: 'block' }}
-            />
+          <div className={styles.profileAvatar} style={{ background: '#6366f1', color: '#fff', fontWeight: 700, fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {(user?.name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
           </div>
           <div className={styles.profileInfo}>
-            <span className={styles.profileName}>Ms. Sarah Johnson</span>
-            <span className={styles.profileRole}>Class Teacher · Grade 4</span>
+            <span className={styles.profileName}>{user?.name || 'User'}</span>
+            <span className={styles.profileRole}>{user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Teacher'}</span>
           </div>
           <span className={styles.profileChevron}>{profileOpen ? '▲' : '▼'}</span>
         </button>
@@ -258,26 +265,20 @@ export default function Dashboard({ onNavigateToAttendance }: { onNavigateToAtte
         {profileOpen && (
           <div className={styles.profileDropdown}>
             <div className={styles.profileDropdownHeader}>
-              <div className={styles.profileAvatarLg}>
-                <img
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=SarahJohnson&backgroundColor=6366f1&clothingColor=6366f1"
-                  alt="Ms. Sarah Johnson"
-                  width="42"
-                  height="42"
-                  style={{ borderRadius: '50%', display: 'block' }}
-                />
+              <div className={styles.profileAvatarLg} style={{ background: '#6366f1', color: '#fff', fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {(user?.name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
               </div>
               <div>
-                <div className={styles.profileDropdownName}>Ms. Sarah Johnson</div>
-                <div className={styles.profileDropdownRole}>Class Teacher</div>
-                <div className={styles.profileDropdownEmail}>sarah.j@school.edu</div>
+                <div className={styles.profileDropdownName}>{user?.name || 'User'}</div>
+                <div className={styles.profileDropdownRole}>{user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Teacher'}</div>
+                <div className={styles.profileDropdownEmail}>{user?.email || ''}</div>
               </div>
             </div>
             <div className={styles.profileDropdownDivider} />
-            <button className={styles.profileDropdownItem}>👤 My Profile</button>
+          
             <div className={styles.profileDropdownDivider} />
-            <button className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`}>
-              🚪 Sign Out
+            <button className={`${styles.profileDropdownItem} ${styles.profileDropdownLogout}`} onClick={() => { setProfileOpen(false); onLogout?.() }}>
+              Sign Out
             </button>
           </div>
         )}
@@ -317,7 +318,12 @@ export default function Dashboard({ onNavigateToAttendance }: { onNavigateToAtte
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={metrics.gradeDistribution}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2d3e" />
-              <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: '#94a3b8', fontSize: 10 }}
+                interval={0}
+                tickFormatter={(v: string) => v.replace('Grade ', 'G')}
+              />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
               <Tooltip contentStyle={{ background: '#1e2130', border: '1px solid #3a3f55', borderRadius: 8 }} />
               <Bar dataKey="value" fill="#6366f1" radius={[3, 3, 0, 0]} name="Students" />

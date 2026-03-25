@@ -1,57 +1,36 @@
 const { generateSql } = require('../services/groqService')
 const { mcpQueryDatabase, mcpGetSchema } = require('../services/mcpClient')
 const { sanitizeSql } = require('../utils/sanitizeSql')
-const { executeQuery } = require('../services/dbService')
 const { StatusCodes } = require('../utils/statusCodes')
+const { mcpAgent } = require('../services/mcpAgent')
 
-async function getSubjects(_req, res) {
+async function getSubjects(req, res) {
   try {
-    const rows = await executeQuery('SELECT subject_id, subject_name FROM subjects ORDER BY subject_name')
-    return res.json({ subjects: rows })
+    const response = await mcpAgent.run({ task: 'Get subjects', data: req.query })
+    res.json({ subjects: response.rows })
   } catch (err) {
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: err.message })
+    res.status(500).json({ error: err.message })
   }
 }
 
-// If subject_id provided, return only grades assigned to that subject via subject_grades table
 async function getGrades(req, res) {
-  const { subject_id } = req.query
   try {
-    let rows
-    if (subject_id) {
-      rows = await executeQuery(
-        'SELECT grade_level FROM subject_grades WHERE subject_id = $1',
-        [Number(subject_id)]
-      )
-    } else {
-      rows = await executeQuery(
-        'SELECT DISTINCT grade_level FROM students WHERE grade_level IS NOT NULL'
-      )
-    }
-    const sorted = rows
-      .map(r => r.grade_level)
-      .sort((a, b) => parseInt(a.replace(/\D/g, ''), 10) - parseInt(b.replace(/\D/g, ''), 10))
-    return res.json({ grades: sorted })
+    const response = await mcpAgent.run({ task: 'Get grades', data: req.query })
+    res.json({ grades: response.data })
   } catch (err) {
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: err.message })
+    res.status(500).json({ error: err.message })
   }
 }
 
 async function getStudentsByGrade(req, res) {
-  const { grade } = req.query
-  if (!grade) return res.status(StatusCodes.BAD_REQUEST).json({ error: 'grade required' })
   try {
-    const rows = await executeQuery(
-      'SELECT student_id, first_name, last_name, grade_level FROM students WHERE grade_level = $1 ORDER BY first_name, last_name',
-      [grade]
-    )
-    return res.json({ students: rows })
+    const response = await mcpAgent.run({ task: 'Get students by grade', data: req.query })
+    res.json({ students: response.rows })
   } catch (err) {
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: err.message })
+    res.status(500).json({ error: err.message })
   }
 }
 
-// AI + MCP — Groq generates upsert SQL from schema + records, MCP executes it
 async function markAttendance(req, res) {
   const { records } = req.body
   if (!Array.isArray(records) || records.length === 0) {
@@ -59,7 +38,6 @@ async function markAttendance(req, res) {
   }
   try {
     const schema = await mcpGetSchema()
-
     const prompt = [
       'You are a PostgreSQL expert. Generate a single SQL statement to upsert attendance records.',
       '',
@@ -84,14 +62,8 @@ async function markAttendance(req, res) {
     ].join('\n')
 
     const rawSql = await generateSql(prompt)
-    console.log('Generated attendance SQL:', rawSql)
-
     const sql = sanitizeSql(rawSql)
-    console.log('Sanitized attendance SQL:', sql)
-
     const rows = await mcpQueryDatabase(sql)
-    console.log('Attendance save result:', Array.isArray(rows) ? rows.length : 0, 'records')
-
     return res.json({ saved: Array.isArray(rows) ? rows.length : 0, records: rows ?? [] })
   } catch (err) {
     console.error('markAttendance error:', err.message)
@@ -100,22 +72,11 @@ async function markAttendance(req, res) {
 }
 
 async function getAttendance(req, res) {
-  const { date, subject_id, grade } = req.query
   try {
-    const conditions = []
-    const params = []
-    let idx = 1
-    if (date)       { conditions.push('a.attendance_date = $' + idx++); params.push(date) }
-    if (subject_id) { conditions.push('a.subject_id = $' + idx++);      params.push(Number(subject_id)) }
-    if (grade)      { conditions.push('s.grade_level = $' + idx++);     params.push(grade) }
-    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
-    const rows = await executeQuery(
-      'SELECT a.*, s.first_name, s.last_name, s.grade_level FROM attendance a JOIN students s ON s.student_id = a.student_id ' + where + ' ORDER BY s.grade_level, s.first_name',
-      params
-    )
-    return res.json({ records: rows })
+    const response = await mcpAgent.run({ task: 'Get attendance records', data: req.query })
+    res.json({ records: response.rows })
   } catch (err) {
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: err.message })
+    res.status(500).json({ error: err.message })
   }
 }
 
