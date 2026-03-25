@@ -1,4 +1,18 @@
 export const Messages = {
+  Auth: {
+    NameInvalid:       'Name must contain only letters',
+    EmailInvalid:      'Enter a valid email address',
+    PasswordShort:     'Min. 6 characters',
+    PasswordNoLetter:  'Must contain at least one letter',
+    PasswordNoNumber:  'Must contain at least one number',
+    PhoneInvalid:      'Enter a valid 10-digit Indian mobile number',
+    AddressShort:      'Address must be at least 5 characters',
+    StateRequired:     'Please select a state',
+    CityRequired:      'Please select a city',
+    SignupFailed:      'Signup failed',
+    LoginFailed:       'Login failed',
+  },
+
   Student: {
     // Validation
     FirstNameRequired: "First name is required",

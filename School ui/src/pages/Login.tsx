@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { postData } from '../utils/api'
 import styles from './Auth.module.css'
 
 interface Props {
@@ -18,13 +19,8 @@ export default function Login({ onSwitchToSignup }: Props) {
     setError('')
     setLoading(true)
     try {
-      const res = await fetch('http://localhost:8000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Login failed')
+      const data = await postData<any>('/api/auth/login', { email, password })
+      if (data.error) throw new Error(data.error)
       const { token, user } = data.data ?? data
       login(token, user)
     } catch (err) {

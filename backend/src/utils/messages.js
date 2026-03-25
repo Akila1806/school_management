@@ -1,4 +1,17 @@
 const Messages = {
+  Auth: {
+    NameEmailPasswordRequired: 'Name, email and password are required',
+    EmailAlreadyRegistered:    'Email already registered',
+    UserInsertFailed:          'User insert failed',
+    LoginFailed:               'Login failed',
+    UserNotFound:              'User not found',
+    NoTokenProvided:           'No token provided',
+    InvalidOrExpiredToken:     'Invalid or expired token',
+    StateRequired:             'state is required',
+    FailedToFetchCities:       'Failed to fetch cities',
+    InvalidEmailOrPassword:    'Invalid email or password',
+  },
+
   Agent: {
     EmptyMessage: 'Message cannot be empty',
     NoDataToExport: 'No data found to export',

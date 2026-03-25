@@ -1,4 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react'
+import { postData, fetchDataFromApi } from '../utils/api'
+import { Messages } from '../utils/messages'
 import styles from './Auth.module.css'
 
 interface Props {
@@ -14,15 +16,15 @@ const STATES = [
 ]
 
 const RULES = {
-  name:     (v: string) => !/^[a-zA-Z\s.'-]+$/.test(v.trim())   ? 'Name must contain only letters' : '',
-  email:    (v: string) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? 'Enter a valid email address' : '',
-  password: (v: string) => v.length < 6                           ? 'Min. 6 characters' :
-                           !/[a-zA-Z]/.test(v)                    ? 'Must contain at least one letter' :
-                           !/[0-9]/.test(v)                       ? 'Must contain at least one number' : '',
-  phone:    (v: string) => !/^[6-9]\d{9}$/.test(v.replace(/[\s\-+]/g, '')) ? 'Enter a valid 10-digit Indian mobile number' : '',
-  address:  (v: string) => v.trim().length < 5                    ? 'Address must be at least 5 characters' : '',
-  state:    (v: string) => !v                                     ? 'Please select a state' : '',
-  city:     (v: string) => !v                                     ? 'Please select a city' : '',
+  name:     (v: string) => !/^[a-zA-Z\s.'-]+$/.test(v.trim())    ? Messages.Auth.NameInvalid : '',
+  email:    (v: string) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)  ? Messages.Auth.EmailInvalid : '',
+  password: (v: string) => v.length < 6                            ? Messages.Auth.PasswordShort :
+                           !/[a-zA-Z]/.test(v)                     ? Messages.Auth.PasswordNoLetter :
+                           !/[0-9]/.test(v)                        ? Messages.Auth.PasswordNoNumber : '',
+  phone:    (v: string) => !/^[6-9]\d{9}$/.test(v.replace(/[\s\-+]/g, '')) ? Messages.Auth.PhoneInvalid : '',
+  address:  (v: string) => v.trim().length < 5                     ? Messages.Auth.AddressShort : '',
+  state:    (v: string) => !v                                      ? Messages.Auth.StateRequired : '',
+  city:     (v: string) => !v                                      ? Messages.Auth.CityRequired : '',
 }
 
 type Field = keyof typeof RULES
@@ -43,8 +45,7 @@ export default function Signup({ onSwitchToLogin }: Props) {
     if (!form.state) { setCities([]); return }
     setCitiesLoading(true)
     set('city', '')
-    fetch(`http://localhost:8000/api/auth/cities?state=${encodeURIComponent(form.state)}`)
-      .then(r => r.json())
+    fetchDataFromApi<{ cities: string[] }>(`/api/auth/cities?state=${encodeURIComponent(form.state)}`)
       .then(d => setCities(d.cities || []))
       .catch(() => setCities([]))
       .finally(() => setCitiesLoading(false))
@@ -62,13 +63,8 @@ export default function Signup({ onSwitchToLogin }: Props) {
     setSubmitError('')
     setLoading(true)
     try {
-      const res = await fetch('http://localhost:8000/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Signup failed')
+      const data = await postData<any>('/api/auth/signup', form)
+      if (data.error) throw new Error(data.error)
       onSwitchToLogin()
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Signup failed')
