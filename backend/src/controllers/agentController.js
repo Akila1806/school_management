@@ -1,4 +1,4 @@
-const { generateSql, summarizeData } = require('../services/groqService')
+const { generateSql, summarizeData, resolveIntent } = require('../services/groqService')
 const { mcpQueryDatabase } = require('../services/mcpClient')
 const { sanitizeSql } = require('../utils/sanitizeSql')
 const { Messages } = require('../utils/messages')
@@ -61,23 +61,57 @@ async function agent(req, res) {
   
   if (!prompt) return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Agent.EmptyMessage })
 
+  // Build conversation history for context-aware SQL generation
+  // history is an array of { role: 'user'|'assistant', content: string }
+  const rawHistory = Array.isArray(req.body.history) ? req.body.history : []
+  // Keep last 6 messages (3 turns) to stay within token limits
+  const history = rawHistory.slice(-6).map(m => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: String(m.content || ''),
+  }))
+
   try {
-    const rawSql = await generateSql(prompt)
+    const resolvedPrompt = await resolveIntent(prompt, history)
+    console.log(`[resolveIntent] "${prompt}" → "${resolvedPrompt}"`)
+    const rawSql = await generateSql(resolvedPrompt)
     console.log("Generated SQL:", rawSql)
     const sql = sanitizeSql(rawSql)
     console.log("Sanitized SQL:", sql)
+    // If this is an UPDATE intent, first SELECT matching students to check for duplicates
+    const isUpdateIntent = /\b(update|change|modify|set|edit)\b/i.test(resolvedPrompt)
+    if (isUpdateIntent && sql.toLowerCase().startsWith('update')) {
+      // Extract WHERE clause and build a SELECT to find matching students
+      const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+RETURNING|;|$)/i)
+      if (whereMatch) {
+        const whereClause = whereMatch[1]
+        const checkSql = `SELECT student_id, first_name, last_name, grade_level, gender, dob, email FROM students WHERE ${whereClause};`
+        const matchedRows = await mcpQueryDatabase(checkSql)
+        console.log("Disambiguation check rows:", matchedRows)
+
+        if (Array.isArray(matchedRows) && matchedRows.length > 1) {
+          return res.status(StatusCodes.OK).json({
+            analysis: `Found ${matchedRows.length} students with that name. Which one do you want to update?`,
+            data: matchedRows,
+            sql,
+            disambiguate: true,
+            originalPrompt: resolvedPrompt,
+          })
+        }
+      }
+    }
+
     const rows = await mcpQueryDatabase(sql)
     console.log("Query Result:", rows)
 
     if (Array.isArray(rows) && rows.length > 1) {
-      const isAllStudents = /all\s+students|list.*students|show.*students/i.test(prompt)
+      const isAllStudents = /all\s+students|list.*students|show.*students/i.test(resolvedPrompt)
       const message = isAllStudents
         ? Messages.Agent.AllStudents(rows.length)
         : Messages.Agent.QueryResults(rows.length)
       return res.status(StatusCodes.OK).json({ analysis: message, data: rows, sql })
     }
 
-    const analysis = await summarizeData(prompt, JSON.stringify(rows, null, 2))
+    const analysis = await summarizeData(resolvedPrompt, JSON.stringify(rows, null, 2))
     console.log("Data Analysis:", analysis)
     res.status(StatusCodes.OK).json({ analysis, data: rows, sql })
   } catch (err) {

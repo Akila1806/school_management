@@ -11,6 +11,8 @@ type Message = {
   sql?: string
   loading?: boolean
   error?: boolean
+  disambiguate?: boolean
+  originalPrompt?: string
 }
 
 interface Props {
@@ -201,6 +203,46 @@ function renderTable(data: Record<string, unknown>[]) {
   )
 }
 
+// ── Disambiguation card renderer ───────────────────────────
+function renderDisambiguationCards(
+  data: Record<string, unknown>[],
+  onPick: (row: Record<string, unknown>) => void
+) {
+  const formatVal = (v: unknown) => {
+    if (!v) return '—'
+    const s = String(v)
+    if (/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(s)) {
+      const d = new Date(s)
+      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+    }
+    return s
+  }
+  return (
+    <div className={styles.disambigList}>
+      {data.map((row, i) => (
+        <button
+          key={i}
+          className={styles.disambigCard}
+          onClick={() => onPick(row)}
+        >
+          <span className={styles.disambigNum}>{i + 1}</span>
+          <div className={styles.disambigInfo}>
+            <span className={styles.disambigName}>
+              {String(row.first_name ?? '')} {String(row.last_name ?? '')}
+            </span>
+            <span className={styles.disambigMeta}>
+              {row.grade_level ? `${row.grade_level}` : ''}
+              {row.gender ? ` · ${row.gender}` : ''}
+              {row.dob ? ` · ${formatVal(row.dob)}` : ''}
+            </span>
+          </div>
+          <span className={styles.disambigAction}>✏️ Update</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function buildFields(form: Record<string, string>) {
   return [
     form.firstName && form.lastName ? `Name: ${form.firstName} ${form.lastName}` : null,
@@ -262,7 +304,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
       ])
       return true
     }
-    if (key === 'show dashboard') {
+    if (/\bdash\w*\b/i.test(key)) {
       onShowDashboard()
       setMessages(prev => [
         ...prev,
@@ -291,7 +333,20 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
       { id: loadingId, role: 'assistant', text: Messages.Chat.Thinking, loading: true },
     ])
     try {
-      const json = await postData('/api/agent', { message: text })
+      // Build history from recent non-loading messages for context awareness
+      // For assistant messages, use the SQL query as content (more reliable than display text)
+      // so the LLM knows exactly what was queried in previous turns
+      const history = messages
+        .filter(m => !m.loading && !m.error)
+        .slice(-6)
+        .map(m => ({
+          role: m.role,
+          content: m.role === 'assistant' && m.sql
+            ? `[SQL executed: ${m.sql}] ${m.text}`
+            : m.text,
+        }))
+
+      const json = await postData('/api/agent', { message: text, history })
       if ((json as any).detail) throw new Error((json as any).detail)
       const j = json as any
       setMessages(prev =>
@@ -368,6 +423,17 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
         ...prev,
         { id: ++msgId, role: 'user', text: trimmed },
         { id: ++msgId, role: 'assistant', text: alreadyOpen ? 'Switched to the open student form.' : 'Opening the student creation form.' },
+      ])
+      return
+    }
+
+    // Detect dashboard intent
+    if (/\bdash\w*\b/i.test(trimmed) || fuzzyMatch(trimmed, 'dashboard', 3)) {
+      onShowDashboard()
+      setMessages(prev => [
+        ...prev,
+        { id: ++msgId, role: 'user', text: trimmed },
+        { id: ++msgId, role: 'assistant', text: 'Switched to the dashboard view.' },
       ])
       return
     }
@@ -467,7 +533,12 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
                 <p>{msg.text}</p>
               ) : (
                 <div className={styles.bubbleText}>
-                  {msg.data && msg.data.length > 1
+                  {msg.disambiguate && msg.data && msg.data.length > 1
+                    ? <>
+                        <div className={styles.chatTableMessage}>{msg.text}</div>
+                        {renderDisambiguationCards(msg.data, onUpdateStudent)}
+                      </>
+                    : msg.data && msg.data.length > 1
                     ? <>
                         <div className={styles.chatTableMessage}>{msg.text}</div>
                         {renderTable(msg.data)}

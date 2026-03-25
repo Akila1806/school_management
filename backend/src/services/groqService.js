@@ -4,13 +4,14 @@ const { mcpGetSchema } = require('./mcpClient')
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.1-8b-instant'
 
-async function callGroq(systemPrompt, userPrompt) {
+async function callGroq(systemPrompt, userPrompt, history = []) {
   const response = await axios.post(
     GROQ_URL,
     {
       model: MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
+        ...history,
         { role: 'user', content: userPrompt },
       ],
       max_tokens: 1024,
@@ -25,6 +26,72 @@ async function callGroq(systemPrompt, userPrompt) {
     }
   )
   return response.data.choices[0].message.content
+}
+
+/**
+ * Resolves the user's intent by:
+ * 1. Fixing spelling/grammar mistakes
+ * 2. Expanding vague follow-ups using conversation history into a clear standalone question
+ *
+ * Examples:
+ *   history: "How many students in Grade 6?" → "There are 12 students in Grade 6."
+ *   prompt:  "hwo are tey" → resolved: "List all students in Grade 6"
+ *
+ *   history: "Show me John's details"
+ *   prompt:  "updaet his emial to x@y.com" → resolved: "Update John's email to x@y.com"
+ */
+async function resolveIntent(prompt, history = []) {
+  // If no history and prompt looks clean enough, skip the extra LLM call
+  if (history.length === 0 && prompt.split(' ').length > 4) return prompt
+
+  const systemPrompt = `You are a query normalizer for a school management chatbot.
+
+Your job:
+1. Fix ALL spelling and grammar mistakes in the user's question.
+2. If the question is a follow-up (uses pronouns or vague references like "they", "them", "their", "him", "her", "it", "those", "that", "who are all", "show them", "list them", "who are they"), rewrite it as a fully self-contained question using context from the conversation history.
+3. CRITICAL: Determine the correct INTENT from the question:
+   - "who are they", "list them", "show them", "who are all", "name them" → intent is LIST (SELECT names/details), NOT count
+   - "how many", "count", "total" → intent is COUNT
+   - "show details", "tell me about" → intent is DETAILS
+   - "update", "change", "modify" → intent is UPDATE
+4. When rewriting follow-ups, ALWAYS use the grade/name/filter from the previous SQL or question in history.
+5. Output ONLY the corrected, standalone question. No explanation, no extra text.
+
+CRITICAL EXAMPLES:
+- history: [user: "how many students in grade 10", assistant: "[SQL: SELECT COUNT(*) FROM students WHERE grade_level='Grade 10'] 1. Count: 12"]
+  input: "who are they" → output: "List all students in Grade 10"
+
+- history: [user: "how many students in grade 10", assistant: "1. Count: 12"]
+  input: "woh are tey" → output: "List all students in Grade 10"
+
+- history: [user: "show grade 5 students", assistant: "Found 8 students in Grade 5"]
+  input: "shwo thier attndance" → output: "Show attendance for Grade 5 students"
+
+- history: [user: "find john smith", assistant: "John Smith, Grade 7, Male"]
+  input: "updaet his emial to john@test.com" → output: "Update John Smith's email to john@test.com"
+
+- history: []
+  input: "hw many studnts in graed 8" → output: "How many students are in Grade 8"
+
+- history: [user: "how many male students", assistant: "Count: 31"]
+  input: "who are all" → output: "List all male students"
+
+- history: [user: "count grade 6 students", assistant: "Count: 7"]
+  input: "names" → output: "List all students in Grade 6"
+
+- history: [user: "count grade 6 students", assistant: "Count: 7"]
+  input: "show them" → output: "List all students in Grade 6"`
+
+  const historyText = history
+    .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .join('\n')
+
+  const userPrompt = history.length > 0
+    ? `Conversation so far:\n${historyText}\n\nCurrent input: "${prompt}"`
+    : `Input: "${prompt}"`
+
+  const resolved = await callGroq(systemPrompt, userPrompt)
+  return resolved.trim().replace(/^["']|["']$/g, '') // strip any surrounding quotes
 }
 
 async function generateSql(prompt) {
@@ -188,4 +255,4 @@ RULES:
   return callGroq(systemPrompt, prompt)
 }
 
-module.exports = { generateSql, summarizeData, getCitiesByState, generateAuthSql }
+module.exports = { generateSql, summarizeData, getCitiesByState, generateAuthSql, resolveIntent }
