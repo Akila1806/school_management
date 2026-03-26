@@ -1,83 +1,178 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-const { getCitiesByState } = require('../services/groqService')
-const { mcpAgent } = require('../services/mcpClient')
-const { StatusCodes } = require('../utils/statusCodes')
+const { generateSql, getCitiesByState } = require('../services/groqService')
+const { mcpQueryDatabase, mcpGetSchema } = require('../services/mcpClient')
+const { sanitizeSql } = require('../utils/sanitizeSql')
 const { Messages } = require('../utils/messages')
+const { StatusCodes } = require('../utils/statusCodes')
 
-const JWT_SECRET = process.env.JWT_SECRET || 'school_secret'
-const JWT_EXPIRES = '7d'
+const JWT_SECRET = process.env.JWT_SECRET || 'school_secret_key'
 
+// POST /api/auth/signup
 async function signup(req, res) {
-  const userData = req.body
-
-  if (!userData.name || !userData.email || !userData.password)
+  if (!req.body.name || !req.body.email || !req.body.password) {
     return res.status(StatusCodes.BAD_REQUEST).json({ error: Messages.Auth.NameEmailPasswordRequired })
+  }
 
   try {
-    const password_hash = await bcrypt.hash(userData.password, 10)
-    const finalData = { ...userData, password_hash }
+    const schema = await mcpGetSchema()
 
-    const response = await mcpAgent.run({ task: 'Create user', data: finalData })
+    // AI: check duplicate email
+    const checkPrompt = [
+      'You are a PostgreSQL expert. Generate a SQL query for the users table.',
+      '',
+      'DATABASE SCHEMA:',
+      schema,
+      '',
+      'TASK: Check if a user with this email already exists.',
+      'INPUT (JSON):',
+      JSON.stringify({ email: req.body.email }, null, 2),
+      '',
+      'STRICT RULES:',
+      '- Output ONLY the SQL, no markdown, no explanation',
+      '- SELECT only the id column',
+      '- Use LIMIT 1',
+    ].join('\n')
 
-    if (!response || !response.data)
-      return res.status(StatusCodes.BAD_REQUEST).json({ error: Messages.Auth.UserInsertFailed })
+    const checkRows = await mcpQueryDatabase(sanitizeSql(await generateSql(checkPrompt)))
+    if (checkRows && checkRows.length > 0) {
+      return res.status(StatusCodes.CONFLICT).json({ error: Messages.Auth.EmailAlreadyRegistered })
+    }
 
-    const user = response.data
+    const password_hash = await bcrypt.hash(req.body.password, 10)
+
+    // AI: insert new user
+    const insertPrompt = [
+      'You are a PostgreSQL expert. Generate a SQL INSERT statement for the users table.',
+      '',
+      'DATABASE SCHEMA:',
+      schema,
+      '',
+      'RECORD TO INSERT (JSON):',
+      JSON.stringify({ ...req.body, password_hash, role: 'teacher', password: undefined }, null, 2),
+      '',
+      'STRICT RULES:',
+      '- Output ONLY the SQL, no markdown, no explanation',
+      '- Columns: name, email, password_hash, role, phone, address, city, state',
+      '- Use ON CONFLICT (email) DO NOTHING',
+      '- End with RETURNING id, name, email, role, phone, address, city, state, created_at',
+      '- Escape all single quotes in string values',
+    ].join('\n')
+
+    const rows = await mcpQueryDatabase(sanitizeSql(await generateSql(insertPrompt)))
+    if (!rows || rows.length === 0) {
+      return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: Messages.Auth.UserInsertFailed })
+    }
+
+    return res.status(StatusCodes.CREATED).json({ message: 'Account created successfully', user: rows[0] })
+  } catch (err) {
+    console.error('signup error:', err.message)
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: Messages.Auth.LoginFailed })
+  }
+}
+
+// POST /api/auth/login
+async function login(req, res) {
+  if (!req.body.email || !req.body.password) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ error: Messages.Auth.NameEmailPasswordRequired })
+  }
+
+  try {
+    const schema = await mcpGetSchema()
+
+    // AI: fetch user by email
+    const selectPrompt = [
+      'You are a PostgreSQL expert. Generate a SQL SELECT query for the users table.',
+      '',
+      'DATABASE SCHEMA:',
+      schema,
+      '',
+      'TASK: Fetch user credentials by email for login.',
+      'INPUT (JSON):',
+      JSON.stringify({ email: req.body.email }, null, 2),
+      '',
+      'STRICT RULES:',
+      '- Output ONLY the SQL, no markdown, no explanation',
+      '- SELECT columns: id, name, email, password_hash, role, phone, address, city, state',
+      '- Use WHERE email = the given email (exact match)',
+      '- Use LIMIT 1',
+    ].join('\n')
+
+    const rows = await mcpQueryDatabase(sanitizeSql(await generateSql(selectPrompt)))
+    if (!rows || rows.length === 0) {
+      return res.status(StatusCodes.UNAUTHORIZED).json({ error: Messages.Auth.InvalidEmailOrPassword })
+    }
+
+    const user = rows[0]
+    const valid = await bcrypt.compare(req.body.password, user.password_hash)
+    if (!valid) {
+      return res.status(StatusCodes.UNAUTHORIZED).json({ error: Messages.Auth.InvalidEmailOrPassword })
+    }
+
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES }
+      { expiresIn: '7d' }
     )
-    res.status(StatusCodes.CREATED).json({ success: true, data: { token, user } })
+    const { password_hash, ...safeUser } = user
+
+    return res.status(StatusCodes.OK).json({ token, user: safeUser })
   } catch (err) {
-    const status = err.message.includes('already') ? StatusCodes.CONFLICT ?? 409 : StatusCodes.INTERNAL_SERVER_ERROR
-    res.status(status).json({ error: err.message })
+    console.error('login error:', err.message)
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: Messages.Auth.LoginFailed })
   }
 }
 
-async function login(req, res) {
-  try {
-    const response = await mcpAgent.run({ task: 'Login user', data: req.body })
-
-    if (!response || !response.data)
-      return res.status(StatusCodes.UNAUTHORIZED).json({ error: Messages.Auth.LoginFailed })
-
-    res.status(StatusCodes.OK).json({ success: true, data: response.data })
-  } catch (err) {
-    console.error('Login error:', err)
-    const status = err.message.includes('Invalid') ? StatusCodes.UNAUTHORIZED : StatusCodes.INTERNAL_SERVER_ERROR
-    res.status(status).json({ error: err.message })
-  }
-}
-
+// GET /api/auth/me
 async function getMe(req, res) {
+  if (!req.headers.authorization || !req.headers.authorization.startsWith('Bearer ')) {
+    return res.status(StatusCodes.UNAUTHORIZED).json({ error: Messages.Auth.NoTokenProvided })
+  }
+
   try {
-    const authHeader = req.headers.authorization
-    if (!authHeader) return res.status(StatusCodes.UNAUTHORIZED).json({ error: Messages.Auth.NoTokenProvided })
+    const decoded = jwt.verify(req.headers.authorization.split(' ')[1], JWT_SECRET)
+    const schema = await mcpGetSchema()
 
-    const token = authHeader.split(' ')[1]
-    const decoded = jwt.verify(token, JWT_SECRET)
+    // AI: fetch user by id
+    const selectPrompt = [
+      'You are a PostgreSQL expert. Generate a SQL SELECT query for the users table.',
+      '',
+      'DATABASE SCHEMA:',
+      schema,
+      '',
+      'TASK: Fetch a user by their numeric ID.',
+      'INPUT (JSON):',
+      JSON.stringify({ id: decoded.id }, null, 2),
+      '',
+      'STRICT RULES:',
+      '- Output ONLY the SQL, no markdown, no explanation',
+      '- SELECT columns: id, name, email, role, phone, address, city, state, created_at',
+      '- Use WHERE id = the given integer ID',
+      '- Use LIMIT 1',
+    ].join('\n')
 
-    const response = await mcpAgent.run({ task: 'Get user', data: { id: decoded.id } })
-
-    if (!response || !response.data)
+    const rows = await mcpQueryDatabase(sanitizeSql(await generateSql(selectPrompt)))
+    if (!rows || rows.length === 0) {
       return res.status(StatusCodes.NOT_FOUND).json({ error: Messages.Auth.UserNotFound })
+    }
 
-    res.status(StatusCodes.OK).json({ user: response.data })
+    return res.status(StatusCodes.OK).json({ user: rows[0] })
   } catch (err) {
-    res.status(StatusCodes.UNAUTHORIZED).json({ error: Messages.Auth.InvalidOrExpiredToken })
+    console.error('getMe error:', err.message)
+    return res.status(StatusCodes.UNAUTHORIZED).json({ error: Messages.Auth.InvalidOrExpiredToken })
   }
 }
 
+// GET /api/auth/cities?state=Tamil Nadu
 async function getCities(req, res) {
-  const { state } = req.query
-  if (!state) return res.status(StatusCodes.BAD_REQUEST).json({ error: Messages.Auth.StateRequired })
+  if (!req.query.state) {
+    return res.status(StatusCodes.BAD_REQUEST).json({ error: Messages.Auth.StateRequired })
+  }
   try {
-    const cities = await getCitiesByState(state)
+    const cities = await getCitiesByState(req.query.state)
     res.status(StatusCodes.OK).json({ cities })
   } catch (err) {
-    console.error('getCities error:', err)
+    console.error('getCities error:', err.message)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: Messages.Auth.FailedToFetchCities })
   }
 }
