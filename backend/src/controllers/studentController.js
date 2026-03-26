@@ -25,17 +25,26 @@ RULES:
 - Use ONLY keys with non-null values
 - Do NOT include student_id
 - Do NOT include email
+- ALWAYS include enrollment_date = CURRENT_DATE
 - Convert dob to YYYY-MM-DD
 - Map camelCase JSON keys to snake_case DB columns
 - Do NOT insert "Not provided" or null values
 - Output ONLY SQL
 
 FORMAT:
-INSERT INTO students (columns...) VALUES (values...) RETURNING *;
+INSERT INTO students (columns..., enrollment_date) VALUES (values..., CURRENT_DATE) ON CONFLICT (email) DO NOTHING RETURNING *;
 `
 
-    const rawSql = await generateSql(prompt)
-    const sql = sanitizeSql(rawSql)
+    // Strip markdown fences only — skip sanitizeSql since INSERT is intentional here
+    let rawSql = await generateSql(prompt)
+    rawSql = rawSql.trim().replace(/^```sql/i, '').replace(/^```/, '').replace(/```$/, '').trim()
+
+    // Safety check: must be an INSERT into students, nothing else
+    if (!/^\s*INSERT\s+INTO\s+students\b/i.test(rawSql)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ error: Messages.Student.InsertFailed })
+    }
+
+    const sql = rawSql
 
     const rows = await mcpQueryDatabase(sql)
     console.log("rowsss",rows);

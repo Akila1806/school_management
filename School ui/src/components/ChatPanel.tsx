@@ -376,80 +376,50 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
     }
   }
 
-  // fuzzy match — checks if any word in input is close to target
-  const fuzzyMatch = (input: string, target: string, maxDist = 3): boolean => {
-    const words = input.toLowerCase().split(/\s+/)
-    const t = target.toLowerCase()
-    for (const word of words) {
-      if (word.length < 3) continue
-      // simple edit distance
-      const a = word, b = t
-      const dp: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
-        Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
-      )
-      for (let i = 1; i <= a.length; i++)
-        for (let j = 1; j <= b.length; j++)
-          dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
-      if (dp[a.length][b.length] <= maxDist) return true
-    }
-    return false
-  }
-
-  const CREATE_STUDENT_PATTERNS = [
-    /cr[ea]{1,3}te?\s+a?\s*stu[a-z]*/i,
-    /add\s+a?\s*stu[a-z]*/i,
-    /new\s+stu[a-z]*/i,
-    /op[a-z]*\s+.*?(stu[a-z]*\s+)?form/i,
-    /fil+\s+.*?form/i,
-    /stu[a-z]*\s+form/i,
-    /reg[a-z]*\s+.*?stu[a-z]*/i,
-    /enro[a-z]*\s+.*?stu[a-z]*/i,
-    /stu[a-z]*\s+reg[a-z]*/i,
-    /insert\s+.*?stu[a-z]*/i,
-  ]
-
-  const send = () => {
+  const send = async () => {
     const trimmed = input.trim()
     if (!trimmed) return
     setInput('')
     setShowSlashMenu(false)
 
+    // Slash commands handled locally
     if (execLocalCommand(trimmed.replace(/^\//, '').toLowerCase(), trimmed)) return
 
-    // Detect create-student intent
-    if (CREATE_STUDENT_PATTERNS.some(p => p.test(trimmed))) {
-      const alreadyOpen = onBadgeClick('Create Student')
-      setMessages(prev => [
-        ...prev,
-        { id: ++msgId, role: 'user', text: trimmed },
-        { id: ++msgId, role: 'assistant', text: alreadyOpen ? 'Switched to the open student form.' : 'Opening the student creation form.' },
-      ])
-      return
-    }
+    try {
+      const json = await postData('/api/classify', { message: trimmed }) as any
+      const intent: string = json.intent ?? 'agent'
 
-    // Detect dashboard intent
-    if (/\bdash\w*\b/i.test(trimmed) || fuzzyMatch(trimmed, 'dashboard', 3)) {
-      onShowDashboard()
-      setMessages(prev => [
-        ...prev,
-        { id: ++msgId, role: 'user', text: trimmed },
-        { id: ++msgId, role: 'assistant', text: 'Switched to the dashboard view.' },
-      ])
-      return
-    }
+      if (intent === 'create_student') {
+        const alreadyOpen = onBadgeClick('Create Student')
+        setMessages(prev => [
+          ...prev,
+          { id: ++msgId, role: 'user', text: trimmed },
+          { id: ++msgId, role: 'assistant', text: alreadyOpen ? 'Switched to the open student form.' : 'Opening the student creation form.' },
+        ])
+        return
+      }
 
-    // Detect attendance intent — regex + fuzzy match for misspellings
-    if (
-      /at{1,2}[ea]n?[dt][ea]?n?[cd]e?|attend|attnd|atend|attndc|mark.*present|mark.*absent|daily.*record|class.*record/i.test(trimmed) ||
-      fuzzyMatch(trimmed, 'attendance', 3)
-    ) {
-      onShowAttendance()
-      setMessages(prev => [
-        ...prev,
-        { id: ++msgId, role: 'user', text: trimmed },
-        { id: ++msgId, role: 'assistant', text: 'Opening the Attendance Sheet.' },
-      ])
-      return
+      if (intent === 'show_dashboard') {
+        onShowDashboard()
+        setMessages(prev => [
+          ...prev,
+          { id: ++msgId, role: 'user', text: trimmed },
+          { id: ++msgId, role: 'assistant', text: 'Switched to the dashboard view.' },
+        ])
+        return
+      }
+
+      if (intent === 'show_attendance') {
+        onShowAttendance()
+        setMessages(prev => [
+          ...prev,
+          { id: ++msgId, role: 'user', text: trimmed },
+          { id: ++msgId, role: 'assistant', text: 'Opening the Attendance Sheet.' },
+        ])
+        return
+      }
+    } catch {
+      // classify failed — fall through to agent
     }
 
     sendToAgent(trimmed)
@@ -536,7 +506,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
                   {msg.disambiguate && msg.data && msg.data.length > 1
                     ? <>
                         <div className={styles.chatTableMessage}>{msg.text}</div>
-                        {renderDisambiguationCards(msg.data, onUpdateStudent)}
+                        {renderDisambiguationCards(msg.data, (row) => {
+                          // Re-send the original prompt but scoped to the chosen student_id
+                          const studentId = row.student_id
+                          const base = msg.originalPrompt || ''
+                          const targeted = `${base} (student_id = ${studentId})`
+                          sendToAgent(targeted)
+                        })}
                       </>
                     : msg.data && msg.data.length > 1
                     ? <>
@@ -566,7 +542,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, Props>(function ChatPanel(
                       ? <span style={{ fontSize: '0.7rem' }}>⏳</span>
                       : <IconExport />}
                   </button>
-                  {msg.data && msg.data.length === 1 && (
+                  {msg.data && msg.data.length === 1 && msg.data[0].student_id !== undefined && (
                     <button
                       className={styles.updateStudentBtn}
                       onClick={() => onUpdateStudent(msg.data![0])}

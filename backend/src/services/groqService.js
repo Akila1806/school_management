@@ -2,7 +2,16 @@ const axios = require('axios')
 const { mcpGetSchema } = require('./mcpClient')
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.1-8b-instant'
+const MODEL = 
+ 'llama-3.3-70b-versatile'
+//  'llama-3.1-8b-instant'
+
+// Cache schema so we don't call MCP on every generateSql invocation
+let _schemaCache = null
+async function getCachedSchema() {
+  if (!_schemaCache) _schemaCache = await mcpGetSchema()
+  return _schemaCache
+}
 
 async function callGroq(systemPrompt, userPrompt, history = []) {
   const response = await axios.post(
@@ -41,7 +50,8 @@ async function callGroq(systemPrompt, userPrompt, history = []) {
  *   prompt:  "updaet his emial to x@y.com" → resolved: "Update John's email to x@y.com"
  */
 async function resolveIntent(prompt, history = []) {
-  // If no history and prompt looks clean enough, skip the extra LLM call
+  // Skip if prompt already has a student_id — it's a targeted update, no resolution needed
+  if (/student_id\s*=\s*\d+/i.test(prompt)) return prompt
   if (history.length === 0 && prompt.split(' ').length > 4) return prompt
 
   const systemPrompt = `You are a query normalizer for a school management chatbot.
@@ -95,17 +105,34 @@ CRITICAL EXAMPLES:
 }
 
 async function generateSql(prompt) {
-  const schema = await mcpGetSchema()
+  const schema = await getCachedSchema()
 
-  // Keep only the students table definition to stay within token limits
+  // Include enough schema lines to cover all tables (students + attendance + relationships)
   const schemaLines = schema.split('\n')
-  const trimmedSchema = schemaLines.slice(0, 40).join('\n')
+  const trimmedSchema = schemaLines.slice(0, 80).join('\n')
 
   const systemPrompt = `You are a PostgreSQL SQL generator for a School Management System.
 Return ONLY a raw SQL SELECT/INSERT/UPDATE query. No markdown, no explanations, no COPY.
 
 SCHEMA:
 ${trimmedSchema}
+
+CROSS-TABLE QUERY RULES (CRITICAL):
+- "status" column belongs to the attendance table, NOT students table
+- attendance table columns: attendance_id, student_id, student_name, subject_id, attendance_date, status, remarks
+- attendance.status values: 'Present', 'Absent', 'Late', 'Excused'
+- students table columns: student_id, first_name, last_name, dob, grade_level, gender, email, parent_phone, address, father_name, mother_name, father_occupation, mother_occupation, created_at
+- NEVER use attendance columns (status, attendance_date, subject_id) in a WHERE clause on the students table
+- For any query involving attendance status + student info, ALWAYS JOIN:
+  SELECT s.first_name, s.last_name, s.parent_phone
+  FROM students s
+  JOIN attendance a ON s.student_id = a.student_id
+  WHERE a.status = 'Late'
+- Examples:
+  * "phone number of late students" → SELECT s.first_name, s.last_name, s.parent_phone FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Late'
+  * "absent students today" → SELECT s.first_name, s.last_name FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Absent' AND a.attendance_date = CURRENT_DATE
+  * "present students in grade 6" → SELECT s.first_name, s.last_name FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Present' AND s.grade_level = 'Grade 6'
+  * "excused students contact" → SELECT s.first_name, s.last_name, s.parent_phone FROM students s JOIN attendance a ON s.student_id = a.student_id WHERE a.status = 'Excused'
 
 CRITICAL INSERT RULES:
 - NEVER include student_id or any ID/primary key columns in INSERT statements
@@ -229,8 +256,53 @@ Include 10-20 well-known cities/towns. Sort alphabetically.`
   return JSON.parse(cleaned)
 }
 
-async function generateAuthSql(prompt) {
-  const systemPrompt = `You are a PostgreSQL SQL generator for a users authentication table.
+async function classifyIntent(prompt) {
+  const systemPrompt = `You are an intent classifier for a school management chatbot.
+
+Classify the user's message into EXACTLY one of these intents:
+- create_student : user wants to add, create, register, enroll a new student, or open the student form (even with typos or indirect phrasing)
+- show_dashboard : user wants to see the dashboard, stats, overview, metrics
+- show_attendance : user explicitly wants to OPEN or NAVIGATE TO the attendance sheet/form (e.g. "open attendance", "go to attendance sheet", "show attendance form")
+- agent : everything else — including ANY question ABOUT attendance data (who is absent, late students, present count, attendance records, etc.)
+
+Rules:
+- Output ONLY the intent label, nothing else. No explanation, no punctuation.
+- Be generous with create_student — if the user is asking to open a form, add a student, register someone, fill a form, it's create_student
+- show_attendance is ONLY for navigation/open requests, NOT for data questions. Any question asking WHO is absent/present/late is agent.
+- Typos and mixed languages are fine — understand the intent
+
+Examples:
+"create student" → create_student
+"add new student" → create_student
+"open student form" → create_student
+"register a kid" → create_student
+"enroll student" → create_student
+"new admission" → create_student
+"student add pannanum" → create_student
+"pudhu student" → create_student
+"show dashboard" → show_dashboard
+"open attendance sheet" → show_attendance
+"go to attendance" → show_attendance
+"show attendance form" → show_attendance
+"mark attendance" → show_attendance
+"who is absent" → agent
+"who is absent today" → agent
+"who are the late students" → agent
+"how many students are present" → agent
+"show absent students" → agent
+"attendance of grade 6" → agent
+"how many students in grade 6" → agent
+"update john's email" → agent`
+
+  const result = await callGroq(systemPrompt, `Message: "${prompt}"`)
+  const intent = result.trim().toLowerCase()
+  // Validate — fallback to agent if unexpected output
+  if (['create_student', 'show_dashboard', 'show_attendance'].includes(intent)) return intent
+  return 'agent'
+}
+
+
+async function generateAuthSql(prompt) {  const systemPrompt = `You are a PostgreSQL SQL generator for a users authentication table.
 
 TABLE SCHEMA:
 users (
@@ -255,4 +327,4 @@ RULES:
   return callGroq(systemPrompt, prompt)
 }
 
-module.exports = { generateSql, summarizeData, getCitiesByState, generateAuthSql, resolveIntent }
+module.exports = { generateSql, summarizeData, getCitiesByState, generateAuthSql, resolveIntent, classifyIntent }

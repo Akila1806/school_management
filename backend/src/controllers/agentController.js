@@ -1,4 +1,4 @@
-const { generateSql, summarizeData, resolveIntent } = require('../services/groqService')
+const { generateSql, summarizeData, resolveIntent, classifyIntent } = require('../services/groqService')
 const { mcpQueryDatabase } = require('../services/mcpClient')
 const { sanitizeSql } = require('../utils/sanitizeSql')
 const { Messages } = require('../utils/messages')
@@ -52,6 +52,46 @@ function formDataToPrompt(data) {
   return parts.join(', ')
 }
 
+const SCHOOL_AI_PROMPT = `
+You are a School Management AI Assistant and best database analysiser and data analysier.
+
+Your job is to answer user questions using the connected database (via MCP tools) and available context.
+
+Guidelines:
+- Understand the user query even if column names are unclear or temporary
+- Infer meaning using data patterns and context
+- Use semantic reasoning instead of exact column matching
+- If exact data is not found, retrieve the closest relevant data
+- NEVER throw errors
+- If data is missing, respond gracefully:
+  - "I couldn't find exact data, but here’s what I found..."
+  - OR "No relevant data available"
+
+Behavior:
+- Always return clean, human-readable responses
+- Do not expose raw database structure unless explicitly asked
+- Handle ambiguous queries by making intelligent assumptions
+- If needed, ask a clarifying question (only when absolutely required)
+
+Output format:
+- Clear answer
+- Optional summary
+- Optional suggestion
+
+Important:
+- Column names may be temporary, unclear, or non-standard
+- You must infer meaning using:
+  - Data patterns
+  - Value types (numbers, dates, names)
+  - Relationships between tables
+- Do NOT rely strictly on column names
+- Use semantic understanding (like a vector database approach)
+
+Goal:
+Provide accurate, safe, and user-friendly answers even with incomplete or unclear database structure.
+`;
+
+
 async function agent(req, res) {
   let prompt = (req.body.message || '').trim()
   
@@ -59,65 +99,118 @@ async function agent(req, res) {
     prompt = formDataToPrompt(req.body)
   }
   
-  if (!prompt) return res.status(StatusCodes.BAD_REQUEST).json({ detail: Messages.Agent.EmptyMessage })
+  if (!prompt)
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      detail: Messages.Agent.EmptyMessage
+    })
 
-  // Build conversation history for context-aware SQL generation
-  // history is an array of { role: 'user'|'assistant', content: string }
+  // Conversation history
   const rawHistory = Array.isArray(req.body.history) ? req.body.history : []
-  // Keep last 6 messages (3 turns) to stay within token limits
+
   const history = rawHistory.slice(-6).map(m => ({
     role: m.role === 'user' ? 'user' : 'assistant',
-    content: String(m.content || ''),
+    content: String(m.content || '')
   }))
 
   try {
-    const resolvedPrompt = await resolveIntent(prompt, history)
+
+    // ✅ Add School AI Prompt
+    const finalPrompt = `
+${SCHOOL_AI_PROMPT}
+
+User Question:
+${prompt}
+`
+
+    const resolvedPrompt = await resolveIntent(finalPrompt, history)
+
     console.log(`[resolveIntent] "${prompt}" → "${resolvedPrompt}"`)
+
     const rawSql = await generateSql(resolvedPrompt)
     console.log("Generated SQL:", rawSql)
+
     const sql = sanitizeSql(rawSql)
     console.log("Sanitized SQL:", sql)
-    // If this is an UPDATE intent, first SELECT matching students to check for duplicates
-    const isUpdateIntent = /\b(update|change|modify|set|edit)\b/i.test(resolvedPrompt)
+
+    // Update Intent Check
+    const isUpdateIntent =
+      /\b(update|change|modify|set|edit)\b/i.test(resolvedPrompt)
+
     if (isUpdateIntent && sql.toLowerCase().startsWith('update')) {
-      // Extract WHERE clause and build a SELECT to find matching students
-      const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+RETURNING|;|$)/i)
+
+      const whereMatch = sql.match(
+        /WHERE\s+(.+?)(?:\s+RETURNING|;|$)/i
+      )
+
       if (whereMatch) {
         const whereClause = whereMatch[1]
-        const checkSql = `SELECT student_id, first_name, last_name, grade_level, gender, dob, email FROM students WHERE ${whereClause};`
+
+        const checkSql = `
+          SELECT student_id, first_name, last_name,
+          grade_level, gender, dob, email
+          FROM students
+          WHERE ${whereClause};
+        `
+
         const matchedRows = await mcpQueryDatabase(checkSql)
+
         console.log("Disambiguation check rows:", matchedRows)
 
         if (Array.isArray(matchedRows) && matchedRows.length > 1) {
           return res.status(StatusCodes.OK).json({
-            analysis: `Found ${matchedRows.length} students with that name. Which one do you want to update?`,
+            analysis: `Found ${matchedRows.length} students. Which one do you want to update?`,
             data: matchedRows,
             sql,
             disambiguate: true,
-            originalPrompt: resolvedPrompt,
+            originalPrompt: resolvedPrompt
           })
         }
       }
     }
 
     const rows = await mcpQueryDatabase(sql)
+
     console.log("Query Result:", rows)
 
     if (Array.isArray(rows) && rows.length > 1) {
-      const isAllStudents = /all\s+students|list.*students|show.*students/i.test(resolvedPrompt)
+
+      const isAllStudents =
+        /all\s+students|list.*students|show.*students/i.test(resolvedPrompt)
+
       const message = isAllStudents
         ? Messages.Agent.AllStudents(rows.length)
         : Messages.Agent.QueryResults(rows.length)
-      return res.status(StatusCodes.OK).json({ analysis: message, data: rows, sql })
+
+      return res.status(StatusCodes.OK).json({
+        analysis: message,
+        data: rows,
+        sql
+      })
     }
 
-    const analysis = await summarizeData(resolvedPrompt, JSON.stringify(rows, null, 2))
+    const analysis = await summarizeData(
+      resolvedPrompt,
+      JSON.stringify(rows, null, 2)
+    )
+
     console.log("Data Analysis:", analysis)
-    res.status(StatusCodes.OK).json({ analysis, data: rows, sql })
+
+    res.status(StatusCodes.OK).json({
+      analysis,
+      data: rows,
+      sql
+    })
+
   } catch (err) {
-    const detail = err.response?.data?.error?.message || err.message
+
+    const detail =
+      err.response?.data?.error?.message || err.message
+
     console.error('Agent error:', detail)
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ detail })
+
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      detail
+    })
   }
 }
 
@@ -181,4 +274,15 @@ async function exportExcel(req, res) {
   }
 }
 
-module.exports = { agent, exportExcel }
+async function classify(req, res) {
+  const prompt = (req.body.message || '').trim()
+  if (!prompt) return res.status(StatusCodes.BAD_REQUEST).json({ detail: 'Message required' })
+  try {
+    const intent = await classifyIntent(prompt)
+    res.status(StatusCodes.OK).json({ intent })
+  } catch (err) {
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ intent: 'agent' })
+  }
+}
+
+module.exports = { agent, exportExcel, classify }

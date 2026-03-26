@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import styles from './AttendanceSheet.module.css'
 import { fetchDataFromApi, postData } from '../utils/api'
 
-type Status = 'Present' | 'Absent' | 'Late' | 'Excused'
+type Status = 'Present' | 'Absent' | 'Late'
 
 interface Student {
   student_id: number
@@ -26,7 +26,6 @@ const STATUS_CONFIG: { key: Status; label: string; short: string }[] = [
   { key: 'Present', label: 'Present', short: 'P' },
   { key: 'Absent', label: 'Absent', short: 'A' },
   { key: 'Late', label: 'Late', short: 'L' },
-  { key: 'Excused', label: 'Excused', short: 'E' },
 ]
 
 const PAGE_SIZE = 10
@@ -143,7 +142,7 @@ export default function AttendanceSheet() {
   }
 
   // Summary counts
-  const counts = { Present: 0, Absent: 0, Late: 0, Excused: 0 }
+  const counts = { Present: 0, Absent: 0, Late: 0 }
   Object.values(rows).forEach(r => { counts[r.status]++ })
 
   const totalPages = Math.ceil(students.length / PAGE_SIZE)
@@ -250,18 +249,17 @@ export default function AttendanceSheet() {
               <th className={styles.centerCol}>P</th>
               <th className={styles.centerCol}>A</th>
               <th className={styles.centerCol}>L</th>
-              <th className={styles.centerCol}>E</th>
               <th>Remarks</th>
             </tr>
           </thead>
           <tbody>
             {loadingStudents ? (
               <tr className={styles.loadingRow}>
-                <td colSpan={7}>Loading students...</td>
+                <td colSpan={6}>Loading students...</td>
               </tr>
             ) : students.length === 0 ? (
               <tr>
-                <td colSpan={7}>
+                <td colSpan={6}>
                   <div className={styles.emptyState}>
                     <div className={styles.emptyIcon}>📋</div>
                     <p className={styles.emptyText}>No students loaded</p>

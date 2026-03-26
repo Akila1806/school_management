@@ -1,6 +1,6 @@
 const { Router } = require('express')
 const { signup, login, getMe, getCities } = require('../controllers/authController')
-const { agent, exportExcel } = require('../controllers/agentController')
+const { agent, exportExcel, classify } = require('../controllers/agentController')
 const { handleStudentRequest, getStudents, getStudentById, updateStudent } = require('../controllers/studentController')
 const { getDashboardData, getDashboardMetrics, clearDashboardCache } = require('../controllers/dashboardController')
 const { getSubjects, getGrades, getStudentsByGrade, markAttendance, getAttendance } = require('../controllers/attendanceController')
@@ -8,6 +8,7 @@ const { getSubjects, getGrades, getStudentsByGrade, markAttendance, getAttendanc
 const router = Router()
 
 router.post('/agent', agent)
+router.post('/classify', classify)
 router.post('/auth/signup', signup)
 router.post('/auth/login', login)
 router.get('/auth/me', getMe)

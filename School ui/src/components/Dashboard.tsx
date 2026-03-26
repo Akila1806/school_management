@@ -125,38 +125,43 @@ export default function Dashboard({ onNavigateToAttendance, user, onLogout, onSh
           present: '#10b981',
           absent: '#ef4444',
           late: '#f59e0b',
-          excused: '#6366f1',
         }
 
         const attendanceRaw = results['get attendance summary by status']?.data || []
-        const attendanceSummary = attendanceRaw.map((r: { status?: string; count?: string }) => {
-          const status = String(r.status ?? '').toLowerCase()
-          return {
-            name: status.charAt(0).toUpperCase() + status.slice(1),
-            value: parseInt(String(r.count ?? '0'), 10),
-            fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
-          }
-        })
+        const attendanceSummary = attendanceRaw
+          .filter((r) => String((r as any).status ?? '').toLowerCase() !== 'excused')
+          .map((r) => {
+            const status = String((r as any).status ?? '').toLowerCase()
+            return {
+              name: status.charAt(0).toUpperCase() + status.slice(1),
+              value: parseInt(String((r as any).count ?? '0'), 10),
+              fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
+            }
+          })
 
         const weeklyRaw = results['get weekly attendance summary']?.data || []
-        const weekly = weeklyRaw.map((r: { status?: string; count?: string }) => {
-          const status = String(r.status ?? '').toLowerCase()
-          return {
-            name: status.charAt(0).toUpperCase() + status.slice(1),
-            value: parseInt(String(r.count ?? '0'), 10),
-            fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
-          }
-        })
+        const weekly = weeklyRaw
+          .filter((r) => String((r as any).status ?? '').toLowerCase() !== 'excused')
+          .map((r) => {
+            const status = String((r as any).status ?? '').toLowerCase()
+            return {
+              name: status.charAt(0).toUpperCase() + status.slice(1),
+              value: parseInt(String((r as any).count ?? '0'), 10),
+              fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
+            }
+          })
 
         const monthlyRaw = results['get last month attendance summary']?.data || []
-        const monthly = monthlyRaw.map((r: { status?: string; count?: string }) => {
-          const status = String(r.status ?? '').toLowerCase()
-          return {
-            name: status.charAt(0).toUpperCase() + status.slice(1),
-            value: parseInt(String(r.count ?? '0'), 10),
-            fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
-          }
-        })
+        const monthly = monthlyRaw
+          .filter((r) => String((r as any).status ?? '').toLowerCase() !== 'excused')
+          .map((r) => {
+            const status = String((r as any).status ?? '').toLowerCase()
+            return {
+              name: status.charAt(0).toUpperCase() + status.slice(1),
+              value: parseInt(String((r as any).count ?? '0'), 10),
+              fill: ATTENDANCE_COLORS[status] ?? '#94a3b8',
+            }
+          })
 
         setWeeklyAttendance(weekly)
         setMonthlyAttendance(monthly)
